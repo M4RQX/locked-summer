@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Dumbbell, Play, History, ChevronRight, Calendar } from 'lucide-react';
+import { Dumbbell, Play, History, ChevronRight, Calendar, Trash2 } from 'lucide-react';
 import Header from '@/components/Header';
 import Loading from '@/components/Loading';
 import { PLANS, nextDayType } from '@/lib/plans';
 import { getCurrentUser } from '@/lib/auth';
-import { getRecentWorkouts, getLastWorkoutDayType, startWorkout } from '@/lib/repo';
+import { getRecentWorkouts, getLastWorkoutDayType, startWorkout, deleteWorkout } from '@/lib/repo';
 import { fmtDate, todayISO } from '@/lib/utils';
 import type { DayType, User, Workout } from '@/types';
 
@@ -81,10 +81,10 @@ export default function WorkoutHome() {
         ) : (
           <ul className="space-y-2">
             {recent.map((w) => (
-              <li key={w.id}>
+              <li key={w.id} className="card flex items-center gap-3">
                 <button
                   onClick={() => navigate(`/treino/${w.id}`)}
-                  className="card w-full text-left flex items-center gap-3 active:scale-[0.99] transition"
+                  className="flex-1 flex items-center gap-3 text-left active:scale-[0.99] transition min-w-0"
                 >
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-display text-2xl ${w.completed_at ? 'bg-gold-500/15 text-gold-400' : 'bg-flame-500/15 text-flame-400'}`}>
                     {w.day_type}
@@ -96,6 +96,18 @@ export default function WorkoutHome() {
                     </p>
                   </div>
                   <ChevronRight size={16} className="text-muted" />
+                </button>
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (!window.confirm(`Apagar treino ${w.day_type} de ${fmtDate(w.date)}? Esta acção é irreversível.`)) return;
+                    await deleteWorkout(w.id);
+                    setRecent((rs) => rs.filter((x) => x.id !== w.id));
+                  }}
+                  className="p-2 rounded-lg text-muted hover:text-flame-400 active:scale-90 transition"
+                  title="Apagar treino"
+                >
+                  <Trash2 size={16} />
                 </button>
               </li>
             ))}

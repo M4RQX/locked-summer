@@ -48,6 +48,10 @@ export async function deleteSet(setId: string): Promise<void> {
 export async function finishWorkout(workoutId: string, durationMin: number, notes: string): Promise<void> {
   await sql`update workouts set duration_minutes = ${durationMin}, notes = ${notes}, completed_at = now() where id = ${workoutId}`;
 }
+export async function deleteWorkout(workoutId: string): Promise<void> {
+  // workout_sets cascades automatically (FK on delete cascade).
+  await sql`delete from workouts where id = ${workoutId}`;
+}
 export async function getExerciseHistory(userId: string, exercise: string, limit = 8): Promise<Array<{ date: string; weight_kg: number; reps: number }>> {
   return (await sql`
     select w.date, s.weight_kg, s.reps
@@ -69,6 +73,26 @@ export async function addFood(f: Omit<Food, 'id' | 'created_at' | 'is_default'>)
     returning *
   `) as Food[];
   return rows[0];
+}
+export async function updateFood(id: string, f: Omit<Food, 'id' | 'created_at' | 'is_default'>): Promise<Food> {
+  const rows = (await sql`
+    update foods set
+      name = ${f.name},
+      category = ${f.category},
+      kcal = ${f.kcal},
+      protein_g = ${f.protein_g},
+      carbs_g = ${f.carbs_g},
+      fat_g = ${f.fat_g},
+      default_portion = ${f.default_portion}
+    where id = ${id}
+    returning *
+  `) as Food[];
+  return rows[0];
+}
+export async function deleteFood(id: string): Promise<void> {
+  // Will fail if any meal_logs reference this food (FK constraint, no cascade).
+  // Caller should handle the error gracefully.
+  await sql`delete from foods where id = ${id}`;
 }
 export async function logMeal(userId: string, date: string, mealType: MealType, foodId: string, multiplier = 1): Promise<MealLog> {
   const rows = (await sql`

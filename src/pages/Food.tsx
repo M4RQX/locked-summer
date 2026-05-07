@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Coffee, Cookie, UtensilsCrossed, Milk, Plus, Search, Trash2, Zap, X, Lock } from 'lucide-react';
+import { Coffee, Cookie, UtensilsCrossed, Milk, Plus, Search, Trash2, Zap, X, Lock, Pencil, Settings as SettingsIcon } from 'lucide-react';
 import Header from '@/components/Header';
 import Loading from '@/components/Loading';
 import ProgressBar from '@/components/ProgressBar';
 import { getCurrentUser } from '@/lib/auth';
-import { listFoods, getMealsForDay, totalsFromMeals, logMeal, deleteMealLog, addFood, logShakeLocked, SHAKE_LOCKED_FOODS } from '@/lib/repo';
+import { listFoods, getMealsForDay, totalsFromMeals, logMeal, deleteMealLog, addFood, updateFood, logShakeLocked, SHAKE_LOCKED_FOODS } from '@/lib/repo';
 import { todayISO } from '@/lib/utils';
 import type { Food, MealLog, MealType, User } from '@/types';
 
@@ -27,7 +27,9 @@ export default function FoodPage() {
   const [meals, setMeals] = useState<Array<MealLog & { food: Food }>>([]);
   const [loading, setLoading] = useState(true);
   const [picker, setPicker] = useState<MealType | null>(null);
+  const [editingFood, setEditingFood] = useState<Food | null>(null);
   const [creating, setCreating] = useState(false);
+  const [shakeManager, setShakeManager] = useState(false);
 
   const refresh = useCallback(async (u: User) => {
     const [fs, ms] = await Promise.all([listFoods(), getMealsForDay(u.id, date)]);
@@ -57,17 +59,26 @@ export default function FoodPage() {
   return (
     <div className="px-5 max-w-md mx-auto space-y-4">
       <Header title="COMIDA" subtitle="hoje · bulk em curso" right={
-        <button
-          onClick={async () => {
-            const n = await logShakeLocked(user.id, date);
-            await refresh(user);
-            if (n > 0) console.info(`+${n} ingredientes do shake LOCKED registados`);
-          }}
-          className="px-3 py-2 rounded-xl bg-gradient-to-br from-gold-500 to-gold-400 text-ink-900 font-bold text-xs uppercase tracking-wider shadow-gold active:scale-95 inline-flex items-center gap-1"
-          title="Adiciona os 6 ingredientes do shake LOCKED de uma vez"
-        >
-          <Zap size={14} /> Shake
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setShakeManager(true)}
+            title="Editar quantidades do shake LOCKED"
+            className="p-2 rounded-xl bg-ink-700/60 border border-ink-500/60 text-muted active:scale-95"
+          >
+            <SettingsIcon size={16} />
+          </button>
+          <button
+            onClick={async () => {
+              const n = await logShakeLocked(user.id, date);
+              await refresh(user);
+              if (n > 0) console.info(`+${n} ingredientes do shake LOCKED registados`);
+            }}
+            className="px-3 py-2 rounded-xl bg-gradient-to-br from-gold-500 to-gold-400 text-ink-900 font-bold text-xs uppercase tracking-wider shadow-gold active:scale-95 inline-flex items-center gap-1"
+            title="Adiciona os 6 ingredientes do shake LOCKED de uma vez"
+          >
+            <Zap size={14} /> Shake
+          </button>
+        </div>
       } />
 
       <div className="card">
@@ -103,9 +114,17 @@ export default function FoodPage() {
                 {items.map((m) => (
                   <li key={m.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-ink-700/50">
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm truncate">{m.food.name}</p>
+                      <p className="font-semibold text-sm truncate flex items-center gap-1.5">
+                        {m.food.name}
+                        {m.food.default_portion && (
+                          <span className="pill bg-ink-800 text-flame-300/80 shrink-0">
+                            {Number(m.portion_multiplier) !== 1
+                              ? `${m.portion_multiplier}× ${m.food.default_portion}`
+                              : m.food.default_portion}
+                          </span>
+                        )}
+                      </p>
                       <p className="text-[11px] text-muted">
-                        {Number(m.portion_multiplier) !== 1 && `${m.portion_multiplier}× · `}
                         {Math.round(Number(m.food.kcal) * Number(m.portion_multiplier))} kcal · {Math.round(Number(m.food.protein_g) * Number(m.portion_multiplier))}P
                       </p>
                     </div>
@@ -136,18 +155,31 @@ export default function FoodPage() {
               await refresh(user);
             }}
             onCreate={() => { setCreating(true); }}
+            onEdit={(f) => { setEditingFood(f); }}
           />
         )}
       </AnimatePresence>
 
       <AnimatePresence>
-        {creating && (
-          <CreateFood
-            onClose={() => setCreating(false)}
-            onCreated={async (f) => {
+        {(creating || editingFood) && (
+          <FoodForm
+            food={editingFood ?? undefined}
+            onClose={() => { setCreating(false); setEditingFood(null); }}
+            onSaved={async () => {
               setCreating(false);
-              setFoods((prev) => [f, ...prev]);
+              setEditingFood(null);
+              await refresh(user);
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {shakeManager && (
+          <ShakeManager
+            foods={foods}
+            onClose={() => setShakeManager(false)}
+            onEdit={(f) => setEditingFood(f)}
           />
         )}
       </AnimatePresence>
@@ -168,13 +200,14 @@ function Macro({ label, value, target, unit, tone }: { label: string; value: num
 }
 
 function FoodPicker({
-  mealType, foods, onClose, onPick, onCreate,
+  mealType, foods, onClose, onPick, onCreate, onEdit,
 }: {
   mealType: MealType;
   foods: Food[];
   onClose: () => void;
   onPick: (foodId: string, mult: number) => Promise<void>;
   onCreate: () => void;
+  onEdit: (f: Food) => void;
 }) {
   const [q, setQ] = useState('');
   const [picked, setPicked] = useState<Food | null>(null);
@@ -210,13 +243,21 @@ function FoodPicker({
             </div>
             <ul className="overflow-y-auto flex-1 -mx-1 space-y-1.5">
               {filtered.map((f) => (
-                <li key={f.id}>
-                  <button onClick={() => setPicked(f)} className="w-full text-left px-3 py-2.5 rounded-xl bg-ink-700/50 active:scale-[0.99]">
+                <li key={f.id} className="flex items-stretch gap-1">
+                  <button onClick={() => setPicked(f)} className="flex-1 text-left px-3 py-2.5 rounded-xl bg-ink-700/50 active:scale-[0.99]">
                     <p className="font-semibold text-sm flex items-center gap-1.5">
                       {SHAKE_LOCKED_FOODS.includes(f.name) && <Lock size={11} className="text-gold-400" />}
                       {f.name}
+                      {f.default_portion && <span className="ml-auto pill bg-ink-800 text-flame-300/80">{f.default_portion}</span>}
                     </p>
-                    <p className="text-[11px] text-muted">{f.kcal} kcal · {f.protein_g}P · {f.carbs_g}C · {f.fat_g}G {f.default_portion ? `· ${f.default_portion}` : ''}</p>
+                    <p className="text-[11px] text-muted">{f.kcal} kcal · {f.protein_g}P · {f.carbs_g}C · {f.fat_g}G</p>
+                  </button>
+                  <button
+                    onClick={() => onEdit(f)}
+                    className="px-3 rounded-xl bg-ink-700/30 text-muted hover:text-flame-400 active:scale-95"
+                    title="Editar quantidade / valores"
+                  >
+                    <Pencil size={14} />
                   </button>
                 </li>
               ))}
@@ -255,8 +296,17 @@ function FoodPicker({
   );
 }
 
-function CreateFood({ onClose, onCreated }: { onClose: () => void; onCreated: (f: Food) => void }) {
-  const [form, setForm] = useState({ name: '', kcal: '', protein_g: '', carbs_g: '', fat_g: '', default_portion: '', category: '' });
+function FoodForm({ food, onClose, onSaved }: { food?: Food; onClose: () => void; onSaved: (f: Food) => void }) {
+  const isEdit = Boolean(food);
+  const [form, setForm] = useState({
+    name: food?.name ?? '',
+    kcal: food ? String(food.kcal) : '',
+    protein_g: food ? String(food.protein_g) : '',
+    carbs_g: food ? String(food.carbs_g) : '',
+    fat_g: food ? String(food.fat_g) : '',
+    default_portion: food?.default_portion ?? '',
+    category: food?.category ?? '',
+  });
   const [busy, setBusy] = useState(false);
   return (
     <motion.div
@@ -271,15 +321,16 @@ function CreateFood({ onClose, onCreated }: { onClose: () => void; onCreated: (f
         className="card w-full max-w-md"
       >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-display text-2xl">Novo alimento</h3>
+          <h3 className="font-display text-2xl">{isEdit ? 'Editar alimento' : 'Novo alimento'}</h3>
           <button onClick={onClose} className="p-2 rounded-lg bg-ink-700/60"><X size={16} /></button>
         </div>
         <div className="space-y-3">
           <div><label className="label">Nome</label><input className="input mt-1" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
           <div className="grid grid-cols-2 gap-2">
             <div><label className="label">kcal</label><input type="number" inputMode="decimal" className="input mt-1" value={form.kcal} onChange={(e) => setForm({ ...form, kcal: e.target.value })} /></div>
-            <div><label className="label">Porção</label><input className="input mt-1" placeholder="100g, 1 unid" value={form.default_portion} onChange={(e) => setForm({ ...form, default_portion: e.target.value })} /></div>
+            <div><label className="label">Quantidade / porção</label><input className="input mt-1" placeholder="80g, 250ml, 1 unid" value={form.default_portion} onChange={(e) => setForm({ ...form, default_portion: e.target.value })} /></div>
           </div>
+          <p className="text-[11px] text-muted -mt-1">Os valores acima são para essa porção. Ex: "80g aveia → 300 kcal".</p>
           <div className="grid grid-cols-3 gap-2">
             <div><label className="label">Prot.</label><input type="number" inputMode="decimal" className="input mt-1" value={form.protein_g} onChange={(e) => setForm({ ...form, protein_g: e.target.value })} /></div>
             <div><label className="label">Hidr.</label><input type="number" inputMode="decimal" className="input mt-1" value={form.carbs_g} onChange={(e) => setForm({ ...form, carbs_g: e.target.value })} /></div>
@@ -290,7 +341,7 @@ function CreateFood({ onClose, onCreated }: { onClose: () => void; onCreated: (f
             onClick={async () => {
               setBusy(true);
               try {
-                const f = await addFood({
+                const payload = {
                   name: form.name,
                   category: form.category || null,
                   kcal: Number(form.kcal) || 0,
@@ -298,14 +349,83 @@ function CreateFood({ onClose, onCreated }: { onClose: () => void; onCreated: (f
                   carbs_g: Number(form.carbs_g) || 0,
                   fat_g: Number(form.fat_g) || 0,
                   default_portion: form.default_portion || null,
-                });
-                onCreated(f);
+                };
+                const f = isEdit && food
+                  ? await updateFood(food.id, payload)
+                  : await addFood(payload);
+                onSaved(f);
               } finally { setBusy(false); }
             }}
             className="btn-primary w-full">
-            <Plus size={14} /> {busy ? 'A guardar…' : 'Guardar'}
+            <Plus size={14} /> {busy ? 'A guardar…' : isEdit ? 'Guardar alterações' : 'Guardar'}
           </button>
         </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function ShakeManager({ foods, onClose, onEdit }: { foods: Food[]; onClose: () => void; onEdit: (f: Food) => void }) {
+  const shakeFoods = foods.filter((f) => SHAKE_LOCKED_FOODS.includes(f.name));
+  const total = shakeFoods.reduce(
+    (acc, f) => ({
+      kcal: acc.kcal + Number(f.kcal),
+      p: acc.p + Number(f.protein_g),
+      c: acc.c + Number(f.carbs_g),
+      g: acc.g + Number(f.fat_g),
+    }),
+    { kcal: 0, p: 0, c: 0, g: 0 },
+  );
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur flex items-end justify-center px-3 pb-3"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        onClick={(e) => e.stopPropagation()}
+        className="card w-full max-w-md max-h-[85dvh] flex flex-col"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-display text-2xl flex items-center gap-2"><Lock size={16} className="text-gold-400" /> Shake LOCKED</h3>
+            <p className="text-[11px] text-muted uppercase tracking-wider">edita as quantidades dos 6 ingredientes</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg bg-ink-700/60"><X size={16} /></button>
+        </div>
+
+        <div className="card !p-3 mb-3 bg-gold-500/5 border-gold-500/30">
+          <p className="label !text-gold-400/80">total do shake</p>
+          <div className="mt-1 grid grid-cols-4 gap-2 text-center">
+            <div><p className="font-display text-2xl text-gold-400">{Math.round(total.kcal)}</p><p className="text-[10px] text-muted">kcal</p></div>
+            <div><p className="font-display text-2xl">{Math.round(total.p)}</p><p className="text-[10px] text-muted">P (g)</p></div>
+            <div><p className="font-display text-2xl">{Math.round(total.c)}</p><p className="text-[10px] text-muted">C (g)</p></div>
+            <div><p className="font-display text-2xl">{Math.round(total.g)}</p><p className="text-[10px] text-muted">G (g)</p></div>
+          </div>
+        </div>
+
+        <ul className="overflow-y-auto flex-1 -mx-1 space-y-2">
+          {shakeFoods.map((f) => (
+            <li key={f.id} className="flex items-center gap-2 px-3 py-3 rounded-xl bg-ink-700/50">
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm flex items-center gap-2">
+                  {f.name}
+                  <span className="pill bg-ink-800 text-gold-300">{f.default_portion ?? '—'}</span>
+                </p>
+                <p className="text-[11px] text-muted">{f.kcal} kcal · {f.protein_g}P · {f.carbs_g}C · {f.fat_g}G</p>
+              </div>
+              <button onClick={() => { onEdit(f); }} className="btn-ghost !py-2 !px-3" title="Editar">
+                <Pencil size={14} /> Editar
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        <p className="text-[11px] text-muted mt-3">
+          Carregar em "Shake" no header soma estes 6 ingredientes em "Shake LOCKED" do dia. Edita aqui se mudares as quantidades.
+        </p>
       </motion.div>
     </motion.div>
   );
