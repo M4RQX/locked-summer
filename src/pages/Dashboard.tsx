@@ -80,7 +80,7 @@ export default function Dashboard() {
   const view = showPartner && partner ? partner : me;
 
   return (
-    <div className="px-5 space-y-4 max-w-md mx-auto">
+    <div className="px-5 md:px-8 space-y-4 max-w-md md:max-w-5xl mx-auto">
       <Header
         title={`Olá, ${me.user.name}`}
         subtitle={showPartner && partner ? `🔁 a ver ${partner.user.name}` : 'Locked in'}
@@ -104,6 +104,7 @@ export default function Dashboard() {
         <p className="font-display text-2xl leading-tight">{quote}</p>
       </motion.div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {/* Próximo treino */}
       <motion.button
         whileTap={{ scale: 0.98 }}
@@ -158,7 +159,7 @@ export default function Dashboard() {
 
       {/* Progresso até alvo de peso */}
       {view.weightKg != null && (
-        <div className="card">
+        <div className="card md:col-span-2">
           <div className="flex items-baseline justify-between mb-2">
             <span className="label">caminho até alvo</span>
             <span className="text-sm tabular-nums text-muted">
@@ -169,6 +170,7 @@ export default function Dashboard() {
           <p className="text-xs text-muted mt-2">{weightTargetPct.toFixed(0)}% do caminho</p>
         </div>
       )}
+      </div>
     </div>
   );
 }

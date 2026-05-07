@@ -12,7 +12,7 @@ const tabs = [
 export default function BottomNav() {
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 z-40 border-t border-ink-600/60 bg-ink-900/85 backdrop-blur-md"
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-ink-600/60 bg-ink-900/85 backdrop-blur-md"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <ul className="grid grid-cols-4 h-16 max-w-md mx-auto">

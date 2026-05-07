@@ -40,7 +40,7 @@ export default function WorkoutHome() {
   if (loading || !user) return <><Header title="TREINO" /><Loading /></>;
 
   return (
-    <div className="px-5 space-y-4 max-w-md mx-auto">
+    <div className="px-5 md:px-8 space-y-4 max-w-md md:max-w-3xl xl:max-w-4xl mx-auto">
       <Header title="TREINO" subtitle="3x semana · bulk muscular" />
 
       <div className="grid grid-cols-3 gap-2">

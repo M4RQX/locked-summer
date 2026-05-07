@@ -57,7 +57,7 @@ export default function FoodPage() {
   if (loading || !user) return <><Header title="COMIDA" /><Loading /></>;
 
   return (
-    <div className="px-5 max-w-md mx-auto space-y-4">
+    <div className="px-5 md:px-8 max-w-md md:max-w-3xl xl:max-w-5xl mx-auto space-y-4">
       <Header title="COMIDA" subtitle="hoje · bulk em curso" right={
         <div className="flex items-center gap-1.5">
           <button

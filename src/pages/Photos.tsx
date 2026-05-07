@@ -58,7 +58,7 @@ export default function PhotosPage() {
   const byAngle = photos.filter((p) => p.angle === angle);
 
   return (
-    <div className="px-5 max-w-md mx-auto space-y-4">
+    <div className="px-5 md:px-8 max-w-md md:max-w-3xl xl:max-w-5xl mx-auto space-y-4">
       <Header title="FOTOS" subtitle="progresso visual · privado" />
 
       <div className="grid grid-cols-3 gap-2">

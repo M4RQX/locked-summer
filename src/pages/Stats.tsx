@@ -51,7 +51,7 @@ export default function StatsPage() {
   if (loading || !user || !snap) return <><Header title="STATS" /><Loading /></>;
 
   return (
-    <div className="px-5 max-w-md mx-auto space-y-4">
+    <div className="px-5 md:px-8 max-w-md md:max-w-3xl xl:max-w-4xl mx-auto space-y-4">
       <Header title="STATS" subtitle="resumo · últimos dias" />
 
       <div className="grid grid-cols-3 gap-2">

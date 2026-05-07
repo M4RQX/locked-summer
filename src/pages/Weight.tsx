@@ -56,7 +56,7 @@ export default function WeightPage() {
     : 0;
 
   return (
-    <div className="px-5 max-w-md mx-auto space-y-4">
+    <div className="px-5 md:px-8 max-w-md md:max-w-3xl xl:max-w-4xl mx-auto space-y-4">
       <Header title="PESO" subtitle="domingo, em jejum" right={
         <button onClick={() => setShowAdd(true)} className="p-2 rounded-xl bg-flame-500/15 border border-flame-400/40 text-flame-400 active:scale-95">
           <Plus size={18} />

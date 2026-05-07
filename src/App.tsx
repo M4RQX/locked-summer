@@ -11,6 +11,7 @@ import PhotosPage from '@/pages/Photos';
 import StatsPage from '@/pages/Stats';
 import SettingsPage from '@/pages/Settings';
 import BottomNav from '@/components/BottomNav';
+import Sidebar from '@/components/Sidebar';
 import { getSession } from '@/lib/auth';
 
 function ProtectedShell({ children }: { children: React.ReactNode }) {
@@ -18,9 +19,12 @@ function ProtectedShell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   if (!hasSession) return <Navigate to="/login" replace state={{ from: location }} />;
   return (
-    <div className="min-h-dvh flex flex-col">
-      <main className="flex-1 pb-safe">{children}</main>
-      <BottomNav />
+    <div className="min-h-dvh flex">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <main className="flex-1 pb-safe md:pb-10">{children}</main>
+        <BottomNav />
+      </div>
     </div>
   );
 }

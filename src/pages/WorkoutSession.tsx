@@ -63,7 +63,7 @@ export default function WorkoutSession() {
   }
 
   return (
-    <div className="px-5 max-w-md mx-auto pb-24">
+    <div className="px-5 md:px-8 max-w-md md:max-w-3xl xl:max-w-4xl mx-auto pb-24">
       <header className="pt-12 pb-3 flex items-center justify-between gap-2" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}>
         <button onClick={() => navigate(-1)} className="p-2 rounded-xl bg-ink-700/60 border border-ink-500/60 active:scale-95">
           <ArrowLeft size={18} />

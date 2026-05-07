@@ -11,7 +11,7 @@ interface Props {
 
 export default function Header({ title, subtitle, showSettings = true, right }: Props) {
   return (
-    <header className="px-5 pt-12 pb-3 flex items-end justify-between gap-3" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}>
+    <header className="pt-12 md:pt-6 pb-3 flex items-end justify-between gap-3" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)' }}>
       <div className="min-w-0">
         <motion.h1
           initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.25 }}
