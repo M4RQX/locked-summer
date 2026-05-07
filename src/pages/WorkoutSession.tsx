@@ -7,9 +7,8 @@ import { getCurrentUser } from '@/lib/auth';
 import {
   getWorkout, getWorkoutSets, logSet, deleteSet, finishWorkout, getExerciseHistory,
   listCustomExercises, addCustomExercise, deleteCustomExercise, updateCustomExercise,
-  type CustomExercise,
+  getDayPlanByCode, type CustomExercise, type UserDayPlanWithExercises,
 } from '@/lib/repo';
-import { getPlan } from '@/lib/plans';
 import { searchExercises, GROUP_LABELS, type Exercise } from '@/lib/exercises';
 import { fmtDate } from '@/lib/utils';
 import type { ExercisePlan, User, Workout, WorkoutSet } from '@/types';
@@ -19,6 +18,7 @@ export default function WorkoutSession() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [workout, setWorkout] = useState<Workout | null>(null);
+  const [plan, setPlan] = useState<UserDayPlanWithExercises | null>(null);
   const [sets, setSets] = useState<WorkoutSet[]>([]);
   const [customs, setCustoms] = useState<CustomExercise[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,8 +28,6 @@ export default function WorkoutSession() {
   const [notes, setNotes] = useState('');
   const [history, setHistory] = useState<Record<string, Array<{ date: string; weight_kg: number; reps: number }>>>({});
   const [openHistory, setOpenHistory] = useState<string | null>(null);
-
-  const plan = workout ? getPlan(workout.day_type) : null;
 
   const refresh = useCallback(async () => {
     if (!id) return;
@@ -49,10 +47,23 @@ export default function WorkoutSession() {
     })();
   }, [navigate, refresh]);
 
+  // Load the user's plan for the workout's day_code (DB-backed, edits reflect here on revisit)
+  useEffect(() => {
+    if (!user || !workout) return;
+    let cancelled = false;
+    getDayPlanByCode(user.id, workout.day_type).then((p) => {
+      if (!cancelled) setPlan(p);
+    });
+    return () => { cancelled = true; };
+  }, [user, workout]);
+
   // Load history on demand per exercise (plan + custom)
   useEffect(() => {
     if (!user || !plan) return;
-    const all = [...plan.exercises.map((e) => e.name), ...customs.map((c) => c.exercise_name)];
+    const all = [
+      ...plan.exercises.map((e) => e.exercise_name),
+      ...customs.map((c) => c.exercise_name),
+    ];
     all.forEach(async (name) => {
       if (history[name]) return;
       const h = await getExerciseHistory(user.id, name, 6);
@@ -66,10 +77,13 @@ export default function WorkoutSession() {
     return map;
   }, [sets]);
 
-  if (loading || !workout || !plan || !user) return <Loading />;
+  if (loading || !workout || !user) return <Loading />;
   if (workout.user_id !== user.id) {
     return <div className="p-6 text-muted">Não tens acesso a este treino.</div>;
   }
+  // plan may be null if user deleted it after starting workout — render with empty plan exercises
+  const planExercises = plan?.exercises ?? [];
+  const subtitleText = plan?.subtitle ?? plan?.title ?? '';
 
   return (
     <div className="px-5 md:px-8 max-w-md md:max-w-3xl xl:max-w-4xl mx-auto pb-24">
@@ -79,28 +93,31 @@ export default function WorkoutSession() {
         </button>
         <div className="text-center">
           <h1 className="font-display text-3xl leading-none">DIA {workout.day_type}</h1>
-          <p className="text-xs text-muted uppercase tracking-widest">{plan.subtitle} · {fmtDate(workout.date, 'd MMM')}</p>
+          <p className="text-xs text-muted uppercase tracking-widest">{subtitleText} · {fmtDate(workout.date, 'd MMM')}</p>
         </div>
         <div className="w-10" />
       </header>
 
       <div className="space-y-3">
-        {plan.exercises.map((ex) => (
-          <ExerciseBlock
-            key={ex.name}
-            exercise={ex}
-            sets={setsByExercise[ex.name] ?? []}
-            history={history[ex.name] ?? []}
-            historyOpen={openHistory === ex.name}
-            onToggleHistory={() => setOpenHistory(openHistory === ex.name ? null : ex.name)}
-            onAdd={async (weight, reps) => {
-              const next = (setsByExercise[ex.name]?.length ?? 0) + 1;
-              await logSet(workout.id, ex.name, next, weight, reps);
-              await refresh();
-            }}
-            onDelete={async (setId) => { await deleteSet(setId); refresh(); }}
-          />
-        ))}
+        {planExercises.map((ex) => {
+          const adapted: ExercisePlan = { name: ex.exercise_name, sets: ex.target_sets, reps: ex.target_reps };
+          return (
+            <ExerciseBlock
+              key={ex.id}
+              exercise={adapted}
+              sets={setsByExercise[ex.exercise_name] ?? []}
+              history={history[ex.exercise_name] ?? []}
+              historyOpen={openHistory === ex.exercise_name}
+              onToggleHistory={() => setOpenHistory(openHistory === ex.exercise_name ? null : ex.exercise_name)}
+              onAdd={async (weight, reps) => {
+                const next = (setsByExercise[ex.exercise_name]?.length ?? 0) + 1;
+                await logSet(workout.id, ex.exercise_name, next, weight, reps);
+                await refresh();
+              }}
+              onDelete={async (setId) => { await deleteSet(setId); refresh(); }}
+            />
+          );
+        })}
 
         {customs.map((c) => (
           <ExerciseBlock
@@ -197,7 +214,7 @@ export default function WorkoutSession() {
         {showAdd && (
           <AddExerciseModal
             existingNames={new Set([
-              ...plan.exercises.map((e) => e.name.toLowerCase()),
+              ...planExercises.map((e) => e.exercise_name.toLowerCase()),
               ...customs.map((c) => c.exercise_name.toLowerCase()),
             ])}
             onClose={() => setShowAdd(false)}

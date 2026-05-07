@@ -10,6 +10,7 @@ import WeightPage from '@/pages/Weight';
 import PhotosPage from '@/pages/Photos';
 import StatsPage from '@/pages/Stats';
 import SettingsPage from '@/pages/Settings';
+import PlanEditor from '@/pages/PlanEditor';
 import BottomNav from '@/components/BottomNav';
 import Sidebar from '@/components/Sidebar';
 import { getSession } from '@/lib/auth';
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<ProtectedShell><Dashboard /></ProtectedShell>} />
           <Route path="/treino" element={<ProtectedShell><WorkoutHome /></ProtectedShell>} />
+          <Route path="/treino/plano" element={<ProtectedShell><PlanEditor /></ProtectedShell>} />
           <Route path="/treino/:id" element={<ProtectedShell><WorkoutSession /></ProtectedShell>} />
           <Route path="/comida" element={<ProtectedShell><FoodPage /></ProtectedShell>} />
           <Route path="/peso" element={<ProtectedShell><WeightPage /></ProtectedShell>} />

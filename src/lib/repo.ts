@@ -62,6 +62,117 @@ export async function getExerciseHistory(userId: string, exercise: string, limit
   `) as Array<{ date: string; weight_kg: number; reps: number }>;
 }
 
+// ---------- User day plans (per-user editable workout templates) ----------
+export interface UserDayPlan {
+  id: string;
+  user_id: string;
+  code: string;
+  title: string;
+  subtitle: string | null;
+  position: number;
+  created_at: string;
+}
+export interface UserDayPlanExercise {
+  id: string;
+  plan_id: string;
+  exercise_name: string;
+  target_sets: number;
+  target_reps: string;
+  position: number;
+  created_at: string;
+}
+export interface UserDayPlanWithExercises extends UserDayPlan {
+  exercises: UserDayPlanExercise[];
+}
+
+export async function listUserDayPlans(userId: string): Promise<UserDayPlanWithExercises[]> {
+  const plans = (await sql`select * from user_day_plans where user_id = ${userId} order by position asc, created_at asc`) as UserDayPlan[];
+  if (plans.length === 0) return [];
+  const planIds = plans.map((p) => p.id);
+  const exercises = (await sql`
+    select * from user_day_plan_exercises
+    where plan_id = any(${planIds as unknown as string})
+    order by plan_id, position asc, created_at asc
+  `) as UserDayPlanExercise[];
+  const byPlan: Record<string, UserDayPlanExercise[]> = {};
+  for (const e of exercises) (byPlan[e.plan_id] ??= []).push(e);
+  return plans.map((p) => ({ ...p, exercises: byPlan[p.id] ?? [] }));
+}
+
+export async function getDayPlanByCode(userId: string, code: string): Promise<UserDayPlanWithExercises | null> {
+  const rows = (await sql`select * from user_day_plans where user_id = ${userId} and code = ${code} limit 1`) as UserDayPlan[];
+  const p = rows[0];
+  if (!p) return null;
+  const ex = (await sql`select * from user_day_plan_exercises where plan_id = ${p.id} order by position asc, created_at asc`) as UserDayPlanExercise[];
+  return { ...p, exercises: ex };
+}
+
+export async function createDayPlan(userId: string, code: string, title: string, subtitle?: string): Promise<UserDayPlan> {
+  const posRows = (await sql`select coalesce(max(position), -1) + 1 as p from user_day_plans where user_id = ${userId}`) as { p: number }[];
+  const position = posRows[0]?.p ?? 0;
+  const rows = (await sql`
+    insert into user_day_plans (user_id, code, title, subtitle, position)
+    values (${userId}, ${code}, ${title}, ${subtitle ?? null}, ${position})
+    returning *
+  `) as UserDayPlan[];
+  return rows[0];
+}
+
+export async function updateDayPlan(id: string, code: string, title: string, subtitle: string | null): Promise<void> {
+  await sql`update user_day_plans set code = ${code}, title = ${title}, subtitle = ${subtitle} where id = ${id}`;
+}
+
+export async function deleteDayPlan(id: string): Promise<void> {
+  await sql`delete from user_day_plans where id = ${id}`;
+}
+
+export async function reorderDayPlans(userId: string, planIds: string[]): Promise<void> {
+  for (let i = 0; i < planIds.length; i++) {
+    await sql`update user_day_plans set position = ${i} where id = ${planIds[i]} and user_id = ${userId}`;
+  }
+}
+
+export async function addPlanExercise(planId: string, name: string, targetSets = 3, targetReps = '8-12'): Promise<UserDayPlanExercise> {
+  const posRows = (await sql`select coalesce(max(position), -1) + 1 as p from user_day_plan_exercises where plan_id = ${planId}`) as { p: number }[];
+  const position = posRows[0]?.p ?? 0;
+  const rows = (await sql`
+    insert into user_day_plan_exercises (plan_id, exercise_name, target_sets, target_reps, position)
+    values (${planId}, ${name}, ${targetSets}, ${targetReps}, ${position})
+    returning *
+  `) as UserDayPlanExercise[];
+  return rows[0];
+}
+
+export async function updatePlanExercise(id: string, name: string, targetSets: number, targetReps: string): Promise<void> {
+  await sql`
+    update user_day_plan_exercises
+    set exercise_name = ${name}, target_sets = ${targetSets}, target_reps = ${targetReps}
+    where id = ${id}
+  `;
+}
+
+export async function deletePlanExercise(id: string): Promise<void> {
+  await sql`delete from user_day_plan_exercises where id = ${id}`;
+}
+
+export async function reorderPlanExercises(planId: string, exerciseIds: string[]): Promise<void> {
+  for (let i = 0; i < exerciseIds.length; i++) {
+    await sql`update user_day_plan_exercises set position = ${i} where id = ${exerciseIds[i]} and plan_id = ${planId}`;
+  }
+}
+
+export async function getNextPlanForUser(userId: string): Promise<UserDayPlanWithExercises | null> {
+  // Determine next plan based on last completed/started workout day_type rotation through user's plans.
+  const plans = await listUserDayPlans(userId);
+  if (plans.length === 0) return null;
+  const lastRows = (await sql`select day_type from workouts where user_id = ${userId} order by date desc, created_at desc limit 1`) as { day_type: string }[];
+  const lastCode = lastRows[0]?.day_type;
+  if (!lastCode) return plans[0];
+  const idx = plans.findIndex((p) => p.code === lastCode);
+  if (idx < 0) return plans[0];
+  return plans[(idx + 1) % plans.length];
+}
+
 // ---------- Custom exercises (added ad-hoc to a session) ----------
 export interface CustomExercise {
   id: string;
