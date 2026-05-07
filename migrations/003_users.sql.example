@@ -1,0 +1,14 @@
+-- LOCKED SUMMER — bootstrap users (RUN MANUALLY após gerares hashes)
+--
+-- 1. Gera os hashes localmente:
+--    npx bcryptjs-cli "PASSWORD_DO_EMANUEL"
+--    npx bcryptjs-cli "PASSWORD_DO_TIAGO"
+--    (ou usa o script `npm run hash-pw` se incluído)
+--
+-- 2. Substitui $HASH_EMANUEL e $HASH_TIAGO abaixo
+-- 3. Corre no Neon SQL editor
+
+insert into users (name, password_hash, target_calories, target_protein, target_weight_kg, start_weight_kg) values
+  ('Emanuel', '$HASH_EMANUEL', 3000, 150, 80, 72),
+  ('Tiago',   '$HASH_TIAGO',   3000, 130, 80, 72)
+on conflict (name) do nothing;
