@@ -9,8 +9,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  // GitHub Pages serves at /<repo>/ — override via VITE_BASE_PATH if needed.
-  const base = env.VITE_BASE_PATH ?? '/locked-summer/';
+  // Default `/` for Vercel/standalone. Override to `/locked-summer/` for GitHub Pages
+  // via VITE_BASE_PATH (the GH Actions workflow already does this).
+  const base = env.VITE_BASE_PATH ?? '/';
   return {
     base,
     plugins: [
