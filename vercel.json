@@ -3,9 +3,8 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "cleanUrls": true,
   "rewrites": [
-    { "source": "/((?!assets/|icons/|favicon.svg|apple-touch-icon.png|manifest.webmanifest|sw.js|workbox-.*\\.js|registerSW.js).*)", "destination": "/index.html" }
+    { "source": "/:path((?!assets/|icons/|favicon\\.svg|apple-touch-icon\\.png|manifest\\.webmanifest|sw\\.js|workbox-.*\\.js|registerSW\\.js|robots\\.txt).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
