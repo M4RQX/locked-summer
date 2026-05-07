@@ -268,6 +268,232 @@ export const GROUP_LABELS: Record<MuscleGroup, string> = {
   funcional:  'Funcional',
 };
 
+// ---------- Demonstrations ----------
+// Mapeamento dos nomes PT do nosso catálogo para os IDs do free-exercise-db
+// (Apache 2.0, github.com/yuhonas/free-exercise-db). Cada ID tem 2 imagens
+// (start/end posture) que servimos directamente do raw.githubusercontent.
+//
+// Nem todos os exercícios PT têm match exacto. Para os que não têm,
+// getExerciseDemo() devolve null e o UI mostra fallback.
+
+const DEMO_BASE = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises';
+
+const DEMO_MAP: Record<string, string> = {
+  // PEITO
+  'Supino plano (barra)':                  'Barbell_Bench_Press_-_Medium_Grip',
+  'Supino plano (halteres)':               'Dumbbell_Bench_Press',
+  'Supino inclinado (barra)':              'Barbell_Incline_Bench_Press_-_Medium-Grip',
+  'Supino inclinado (halteres)':           'Incline_Dumbbell_Press',
+  'Supino declinado (barra)':              'Decline_Barbell_Bench_Press',
+  'Supino declinado (halteres)':           'Decline_Dumbbell_Bench_Press',
+  'Aberturas (peck deck)':                 'Butterfly',
+  'Aberturas (halteres)':                  'Dumbbell_Flyes',
+  'Crucifixo cabos cruzados':              'Cable_Crossover',
+  'Crucifixo banco inclinado':             'Incline_Dumbbell_Flyes',
+  'Crucifixo banco declinado':             'Decline_Dumbbell_Flyes',
+  'Pullover (haltere)':                    'Dumbbell_Pullover',
+  'Pullover (cabo)':                       'Cable_Rope_Overhead_Triceps_Extension',
+  'Flexões (push-up)':                     'Pushups',
+  'Flexões diamante':                      'Close-Grip_Push-Up_off_of_a_Dumbbell',
+  'Flexões inclinadas':                    'Incline_Push-Up',
+  'Flexões declinadas':                    'Decline_Push-Up',
+  'Smith machine bench press':             'Smith_Machine_Bench_Press',
+
+  // COSTAS
+  'Puxada na polia alta (frente)':         'Wide-Grip_Lat_Pulldown',
+  'Puxada na polia alta (atrás)':          'Wide-Grip_Pulldown_Behind_The_Neck',
+  'Puxada com pega aberta':                'Wide-Grip_Lat_Pulldown',
+  'Puxada com pega fechada':               'Close-Grip_Front_Lat_Pulldown',
+  'Puxada com pega neutra':                'V-Bar_Pulldown',
+  'Pull-ups':                              'Pullups',
+  'Chin-ups':                              'Chin-Up',
+  'Pull-ups assistidos':                   'Machine-Assisted_Pull-Up',
+  'Remada com barra (pronada)':            'Bent_Over_Barbell_Row',
+  'Remada com barra (supinada)':           'Underhand_Cable_Pulldowns',
+  'Remada T-bar':                          'T-Bar_Row_with_Handle',
+  'Remada cavalinho':                      'Seated_Cable_Rows',
+  'Remada unilateral haltere':             'One-Arm_Dumbbell_Row',
+  'Remada baixa (polia)':                  'Seated_Cable_Rows',
+  'Remada Pendlay':                        'Pendlay_Row',
+  'Levantamento terra (deadlift)':         'Barbell_Deadlift',
+  'Peso morto romeno (RDL)':               'Romanian_Deadlift',
+  'Stiff leg deadlift':                    'Stiff-Legged_Barbell_Deadlift',
+  'Hiperextensão lombar':                  'Hyperextensions',
+  'Good morning':                          'Good_Morning',
+  'Pulldown corda (face pull baixo)':      'Face_Pull',
+  'Straight-arm pulldown':                 'Cable_Straight-Arm_Pulldown',
+  'Encolhimentos (shrugs barra)':          'Barbell_Shrug',
+  'Encolhimentos (shrugs halteres)':       'Dumbbell_Shrug',
+
+  // PERNAS
+  'Agachamento livre':                     'Barbell_Squat',
+  'Agachamento smith':                     'Smith_Machine_Squat',
+  'Agachamento frontal':                   'Front_Barbell_Squat',
+  'Agachamento búlgaro':                   'Single-Leg_Squat',
+  'Agachamento sumô':                      'Sumo_Deadlift',
+  'Agachamento goblet':                    'Goblet_Squat',
+  'Pistol squat':                          'Single-Leg_Squat',
+  'Hack squat':                            'Hack_Squat',
+  'Prensa 45º':                            'Leg_Press',
+  'Prensa horizontal':                     'Wide_Stance_Hack_Squats',
+  'Extensão de pernas':                    'Leg_Extensions',
+  'Cadeira flexora deitada':               'Lying_Leg_Curls',
+  'Cadeira flexora sentada':               'Seated_Leg_Curl',
+  'Adutora':                               'Thigh_Adductor',
+  'Abdutora':                               'Thigh_Abductor',
+  'Lunges (estático)':                     'Dumbbell_Lunges',
+  'Lunges andando':                        'Bodyweight_Walking_Lunge',
+  'Lunges reverso':                        'Reverse_Dumbbell_Lunge',
+  'Step-up':                               'Dumbbell_Step-Ups',
+  'Sissy squat':                           'Sissy_Squat',
+  'Gémeos em pé (máquina)':                'Standing_Calf_Raises',
+  'Gémeos sentado':                        'Seated_Calf_Raise',
+  'Gémeos burro':                          'Donkey_Calf_Raises',
+  'Single-leg calf raise':                 'Standing_Dumbbell_Calf_Raise',
+
+  // GLÚTEOS
+  'Hip thrust (barra)':                    'Barbell_Hip_Thrust',
+  'Glute bridge':                          'Glute_Bridge',
+  'Cable pull-through':                    'Cable_Hip_Adduction',
+
+  // OMBROS
+  'Desenvolvimento militar (barra)':       'Barbell_Shoulder_Press',
+  'Desenvolvimento militar (halteres)':    'Dumbbell_Shoulder_Press',
+  'Desenvolvimento Arnold':                'Arnold_Dumbbell_Press',
+  'Push press':                            'Push_Press',
+  'Elevações laterais (halteres)':         'Side_Lateral_Raise',
+  'Elevações laterais (cabo)':             'Side_Lateral_Raise', // closest match
+  'Elevações frontais (halteres)':         'Front_Dumbbell_Raise',
+  'Elevações frontais (barra)':            'Front_Barbell_Raise',
+  'Elevações frontais (cabo)':             'Cable_Seated_Lateral_Raise',
+  'Elevações posteriores (pássaro)':       'Bent-Knee_Hip_Raise',
+  'Reverse pec deck':                      'Reverse_Machine_Flyes',
+  'Face pull':                             'Face_Pull',
+  'Remada alta (barra)':                   'Upright_Row',
+  'Remada alta (cabo)':                    'Upright_Cable_Row',
+  'Pike push-up':                          'Pike_Press',
+
+  // BÍCEPS
+  'Rosca direta (barra)':                  'Barbell_Curl',
+  'Rosca direta (barra W/EZ)':             'EZ-Bar_Curl',
+  'Rosca direta (halteres)':               'Dumbbell_Bicep_Curl',
+  'Rosca alternada':                       'Alternate_Incline_Dumbbell_Curl',
+  'Rosca martelo':                         'Hammer_Curls',
+  'Rosca inversa':                         'Reverse_Barbell_Curl',
+  'Rosca scott (barra)':                   'Preacher_Curl',
+  'Rosca scott (halteres)':                'Dumbbell_Preacher_Curl',
+  'Rosca concentrada':                     'Concentration_Curls',
+  'Rosca 21':                              '21s',
+  'Rosca cabo (barra)':                    'Cable_Hammer_Curls_-_Rope_Attachment',
+  'Rosca cabo (corda)':                    'Cable_Hammer_Curls_-_Rope_Attachment',
+  'Spider curl':                           'Spider_Curl',
+  'Drag curl':                             'Drag_Curl',
+  'Incline dumbbell curl':                 'Alternate_Incline_Dumbbell_Curl',
+  'Zottman curl':                          'Zottman_Curl',
+
+  // TRÍCEPS
+  'Tríceps polia (corda)':                 'Triceps_Pushdown_-_Rope_Attachment',
+  'Tríceps polia (barra)':                 'Triceps_Pushdown',
+  'Tríceps polia (pega V)':                'Triceps_Pushdown_-_V-Bar_Attachment',
+  'Tríceps testa (barra)':                 'EZ-Bar_Skullcrusher',
+  'Tríceps testa (halteres)':              'Lying_Dumbbell_Tricep_Extension',
+  'Tríceps francês':                       'Standing_Dumbbell_Triceps_Extension',
+  'Tríceps banco':                         'Bench_Dips',
+  'Tríceps fundos paralelas':              'Dips_-_Triceps_Version',
+  'Tríceps fundos máquina':                'Machine_Triceps_Extension',
+  'Skull crusher':                         'EZ-Bar_Skullcrusher',
+  'Kickback (haltere)':                    'Tricep_Dumbbell_Kickback',
+  'Kickback (cabo)':                       'Triceps_Pushdown',
+  'Overhead extension (corda)':            'Cable_Rope_Overhead_Triceps_Extension',
+  'Overhead extension (barra)':            'Standing_Triceps_Extension',
+  'Close-grip bench press':                'Close-Grip_Barbell_Bench_Press',
+  'JM press':                              'JM_Press',
+
+  // ANTEBRAÇO
+  'Rosca de punho (flexores)':             'Palms-Down_Wrist_Curl_Over_A_Bench',
+  'Rosca de punho inversa (extensores)':   'Palms-Up_Barbell_Wrist_Curl',
+  "Farmer's walk":                         'Farmers_Walk',
+  'Wrist roller':                          'Wrist_Roller',
+
+  // CORE
+  'Prancha frontal':                       'Plank',
+  'Prancha lateral':                       'Side_Bridge',
+  'Russian twist':                         'Russian_Twist',
+  'Russian twist (com peso)':              'Weighted_Russian_Twist',
+  'Crunch':                                'Crunches',
+  'Crunch declinado':                      'Decline_Crunch',
+  'Bicycle crunch':                        'Air_Bike',
+  'Reverse crunch':                        'Reverse_Crunch',
+  'Cable crunch':                          'Kneeling_Cable_Crunch_With_Alternating_Oblique_Twists',
+  'Hanging leg raise':                     'Hanging_Leg_Raise',
+  'Lying leg raise':                       'Lying_Leg_Raises',
+  'Toes to bar':                           'Hanging_Leg_Raise',
+  'Mountain climber':                      'Mountain_Climbers',
+  'Ab wheel rollout':                      'Ab_Roller',
+  'V-up':                                  'V-Up',
+  'Sit-up':                                'Full_Body_Sit-Up',
+  'Decline sit-up':                        'Decline_Crunch',
+  'Wood chopper':                          'Cable_Wood_Chop',
+  'Pallof press':                          'Pallof_Press',
+  'Dead bug':                              'Bird_Dog',
+  'Bird dog':                              'Bird_Dog',
+  'Hollow body hold':                      'Hollow_Hold',
+
+  // CARDIO
+  'Saltar à corda':                        'Rope_Jumping',
+  'Burpees':                               'Burpees',
+  'Jumping jacks':                         'Jumping_Jacks',
+  'Box jump':                              'Box_Jump',
+  'Sled push':                             'Sled_Push',
+
+  // FUNCIONAL
+  'Kettlebell swing':                      'Kettlebell_Swing',
+  'Kettlebell snatch':                     'Kettlebell_Snatch',
+  'Kettlebell clean':                      'Kettlebell_Clean',
+  'Kettlebell goblet squat':               'Goblet_Squat',
+  'Turkish get-up':                        'Turkish_Get-Up',
+  'Power clean':                           'Power_Clean',
+  'Hang clean':                            'Hang_Clean',
+  'Snatch':                                'Snatch',
+  'Hang snatch':                           'Hang_Snatch',
+  'Clean and jerk':                        'Clean_And_Jerk',
+  'Thruster':                              'Barbell_Thruster',
+  'Wall ball':                             'Wall_Ball',
+  'Medicine ball slam':                    'Medicine_Ball_Slam',
+};
+
+// Fuzzy fallback para nomes do plano legacy ou custom: tenta normalizar e procurar.
+function normalize(s: string): string {
+  return s.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\([^)]*\)/g, '')
+    .replace(/[^a-z0-9 ]/g, '')
+    .trim();
+}
+
+const NORMALIZED_MAP: Record<string, string> = (() => {
+  const m: Record<string, string> = {};
+  for (const [k, v] of Object.entries(DEMO_MAP)) m[normalize(k)] = v;
+  return m;
+})();
+
+export interface ExerciseDemo {
+  start: string;
+  end: string;
+  source: string;
+}
+
+export function getExerciseDemo(name: string): ExerciseDemo | null {
+  const direct = DEMO_MAP[name];
+  const id = direct ?? NORMALIZED_MAP[normalize(name)];
+  if (!id) return null;
+  return {
+    start: `${DEMO_BASE}/${id}/0.jpg`,
+    end:   `${DEMO_BASE}/${id}/1.jpg`,
+    source: 'free-exercise-db',
+  };
+}
+
 export function searchExercises(query: string, limit = 30): Exercise[] {
   const q = query.trim().toLowerCase();
   if (!q) return EXERCISES.slice(0, limit);

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Check, Flame, Plus, Trash2, History as HistoryIcon, Trophy, X, Search, Dumbbell } from 'lucide-react';
+import { ArrowLeft, Check, Flame, Plus, Trash2, History as HistoryIcon, Trophy, X, Search, Dumbbell, Info } from 'lucide-react';
 import Loading from '@/components/Loading';
+import ExerciseDemoModal from '@/components/ExerciseDemoModal';
 import { getCurrentUser } from '@/lib/auth';
 import {
   getWorkout, getWorkoutSets, logSet, deleteSet, finishWorkout, getExerciseHistory,
@@ -24,6 +25,7 @@ export default function WorkoutSession() {
   const [loading, setLoading] = useState(true);
   const [showFinish, setShowFinish] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [demoOpen, setDemoOpen] = useState<string | null>(null);
   const [duration, setDuration] = useState('');
   const [notes, setNotes] = useState('');
   const [history, setHistory] = useState<Record<string, Array<{ date: string; weight_kg: number; reps: number }>>>({});
@@ -108,6 +110,7 @@ export default function WorkoutSession() {
               sets={setsByExercise[ex.exercise_name] ?? []}
               history={history[ex.exercise_name] ?? []}
               historyOpen={openHistory === ex.exercise_name}
+              onShowDemo={() => setDemoOpen(ex.exercise_name)}
               onToggleHistory={() => setOpenHistory(openHistory === ex.exercise_name ? null : ex.exercise_name)}
               onAdd={async (weight, reps) => {
                 const next = (setsByExercise[ex.exercise_name]?.length ?? 0) + 1;
@@ -127,6 +130,7 @@ export default function WorkoutSession() {
             history={history[c.exercise_name] ?? []}
             historyOpen={openHistory === c.exercise_name}
             isCustom
+            onShowDemo={() => setDemoOpen(c.exercise_name)}
             onToggleHistory={() => setOpenHistory(openHistory === c.exercise_name ? null : c.exercise_name)}
             onAdd={async (weight, reps) => {
               const next = (setsByExercise[c.exercise_name]?.length ?? 0) + 1;
@@ -211,6 +215,12 @@ export default function WorkoutSession() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {demoOpen && (
+          <ExerciseDemoModal exerciseName={demoOpen} onClose={() => setDemoOpen(null)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {showAdd && (
           <AddExerciseModal
             existingNames={new Set([
@@ -236,6 +246,7 @@ interface BlockProps {
   history: Array<{ date: string; weight_kg: number; reps: number }>;
   historyOpen: boolean;
   isCustom?: boolean;
+  onShowDemo?: () => void;
   onToggleHistory: () => void;
   onAdd: (weight: number, reps: number) => Promise<void>;
   onDelete: (setId: string) => Promise<void>;
@@ -243,7 +254,7 @@ interface BlockProps {
   onRemoveExercise?: () => Promise<void>;
 }
 
-function ExerciseBlock({ exercise, sets, history, historyOpen, isCustom, onToggleHistory, onAdd, onDelete, onUpdateTarget, onRemoveExercise }: BlockProps) {
+function ExerciseBlock({ exercise, sets, history, historyOpen, isCustom, onShowDemo, onToggleHistory, onAdd, onDelete, onUpdateTarget, onRemoveExercise }: BlockProps) {
   const [w, setW] = useState('');
   const [r, setR] = useState('');
   const [busy, setBusy] = useState(false);
@@ -291,6 +302,11 @@ function ExerciseBlock({ exercise, sets, history, historyOpen, isCustom, onToggl
           </button>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {onShowDemo && (
+            <button onClick={onShowDemo} className="p-1.5 rounded-lg text-muted hover:text-flame-400" title="Como fazer">
+              <Info size={14} />
+            </button>
+          )}
           <span className={`pill ${done >= targetSets ? 'bg-gold-500/20 text-gold-400' : 'bg-ink-700 text-muted'}`}>
             {done}/{targetSets}
           </span>

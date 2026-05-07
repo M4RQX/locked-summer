@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Pencil, X, Search, Dumbbell, Save,
+  ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Pencil, X, Search, Dumbbell, Save, Info,
 } from 'lucide-react';
 import Loading from '@/components/Loading';
+import ExerciseDemoModal from '@/components/ExerciseDemoModal';
 import { getCurrentUser } from '@/lib/auth';
 import {
   listUserDayPlans, createDayPlan, updateDayPlan, deleteDayPlan, reorderDayPlans,
@@ -258,6 +259,7 @@ function DayDetailModal({
   const [subtitle, setSubtitle] = useState(plan.subtitle ?? '');
   const [showPicker, setShowPicker] = useState(false);
   const [editingEx, setEditingEx] = useState<UserDayPlanExercise | null>(null);
+  const [demoOpen, setDemoOpen] = useState<string | null>(null);
   const [savingMeta, setSavingMeta] = useState(false);
 
   const dirty = code !== plan.code || title !== plan.title || (subtitle ?? '') !== (plan.subtitle ?? '');
@@ -354,12 +356,21 @@ function DayDetailModal({
                 <p className="font-semibold text-sm truncate">{ex.exercise_name}</p>
                 <p className="text-[11px] text-muted">{ex.target_sets} × {ex.target_reps}</p>
               </button>
+              <button onClick={() => setDemoOpen(ex.exercise_name)} className="p-1.5 text-muted hover:text-flame-400" title="Como fazer">
+                <Info size={13} />
+              </button>
               <button onClick={() => onDeleteExercise(ex.id)} className="p-1.5 text-muted hover:text-flame-400">
                 <Trash2 size={13} />
               </button>
             </li>
           ))}
         </ul>
+
+        <AnimatePresence>
+          {demoOpen && (
+            <ExerciseDemoModal exerciseName={demoOpen} onClose={() => setDemoOpen(null)} />
+          )}
+        </AnimatePresence>
 
         <AnimatePresence>
           {showPicker && (
@@ -405,6 +416,7 @@ function ExercisePicker({
   const [sets, setSets] = useState('3');
   const [reps, setReps] = useState('8-12');
   const [busy, setBusy] = useState(false);
+  const [previewName, setPreviewName] = useState<string | null>(null);
 
   const hasQuery = q.trim().length > 0;
   const results = useMemo(() => hasQuery ? searchExercises(q, 50) : [], [q, hasQuery]);
@@ -439,17 +451,24 @@ function ExercisePicker({
               {results.map((e) => {
                 const already = existingNames.has(e.name.toLowerCase());
                 return (
-                  <li key={e.name}>
+                  <li key={e.name} className={`flex items-stretch gap-1 ${already ? 'opacity-50' : ''}`}>
                     <button
                       disabled={already}
                       onClick={() => setPicked(e)}
-                      className={`w-full text-left px-3 py-2.5 rounded-xl active:scale-[0.99] ${already ? 'bg-ink-700/30 opacity-50' : 'bg-ink-700/50'}`}
+                      className={`flex-1 text-left px-3 py-2.5 rounded-xl active:scale-[0.99] ${already ? 'bg-ink-700/30' : 'bg-ink-700/50'}`}
                     >
                       <p className="font-semibold text-sm flex items-center justify-between gap-2">
                         <span className="truncate">{e.name}</span>
-                        <span className="pill bg-ink-800 text-flame-300/80 text-[10px]">{GROUP_LABELS[e.group]}</span>
+                        <span className="pill bg-ink-800 text-flame-300/80 text-[10px] shrink-0">{GROUP_LABELS[e.group]}</span>
                       </p>
                       {already && <p className="text-[10px] text-muted">já está no plano</p>}
+                    </button>
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); setPreviewName(e.name); }}
+                      className="px-3 rounded-xl bg-ink-700/30 text-muted hover:text-flame-400 active:scale-95"
+                      title="Ver demonstração"
+                    >
+                      <Info size={14} />
                     </button>
                   </li>
                 );
@@ -478,9 +497,14 @@ function ExercisePicker({
 
         {picked && (
           <div className="space-y-3">
-            <div className="card !p-3 bg-flame-500/5 border-flame-400/30">
-              <p className="font-semibold">{customName || picked.name}</p>
-              <p className="text-[11px] text-muted uppercase tracking-wider">{GROUP_LABELS[picked.group]}</p>
+            <div className="card !p-3 bg-flame-500/5 border-flame-400/30 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-semibold truncate">{customName || picked.name}</p>
+                <p className="text-[11px] text-muted uppercase tracking-wider">{GROUP_LABELS[picked.group]}</p>
+              </div>
+              <button onClick={() => setPreviewName(customName || picked.name)} className="p-1.5 text-muted hover:text-flame-400 shrink-0" title="Ver demonstração">
+                <Info size={14} />
+              </button>
             </div>
             <SetsReps sets={sets} setSets={setSets} reps={reps} setReps={setReps} />
             <div className="grid grid-cols-2 gap-2">
@@ -501,6 +525,12 @@ function ExercisePicker({
             </div>
           </div>
         )}
+
+        <AnimatePresence>
+          {previewName && (
+            <ExerciseDemoModal exerciseName={previewName} onClose={() => setPreviewName(null)} />
+          )}
+        </AnimatePresence>
       </motion.div>
     </motion.div>
   );
