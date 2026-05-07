@@ -406,7 +406,8 @@ function ExercisePicker({
   const [reps, setReps] = useState('8-12');
   const [busy, setBusy] = useState(false);
 
-  const results = useMemo(() => searchExercises(q, 50), [q]);
+  const hasQuery = q.trim().length > 0;
+  const results = useMemo(() => hasQuery ? searchExercises(q, 50) : [], [q, hasQuery]);
   const showCustom = q.trim().length >= 3 && results.length === 0;
 
   return (
@@ -453,8 +454,12 @@ function ExercisePicker({
                   </li>
                 );
               })}
-              {results.length === 0 && q.trim().length === 0 && (
-                <li className="text-muted text-sm text-center py-4">começa a escrever…</li>
+              {!hasQuery && (
+                <li className="flex flex-col items-center text-center py-8 px-4 gap-2">
+                  <Search size={28} className="text-flame-400/60" />
+                  <p className="text-sm font-semibold">Procura um exercício</p>
+                  <p className="text-xs text-muted">Catálogo com 200+ exercícios. Tenta "supino", "lat", "agachamento", "rosca", "pernas", "peito"…</p>
+                </li>
               )}
               {showCustom && (
                 <li className="card !p-3 mt-2 border-dashed border-flame-400/30">
