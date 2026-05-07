@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Check, Flame, Plus, Trash2, History as HistoryIcon, Trophy, X } from 'lucide-react';
+import { ArrowLeft, Check, Flame, Plus, Trash2, History as HistoryIcon, Trophy, X, Search, Dumbbell } from 'lucide-react';
 import Loading from '@/components/Loading';
 import { getCurrentUser } from '@/lib/auth';
-import { getWorkout, getWorkoutSets, logSet, deleteSet, finishWorkout, getExerciseHistory } from '@/lib/repo';
+import {
+  getWorkout, getWorkoutSets, logSet, deleteSet, finishWorkout, getExerciseHistory,
+  listCustomExercises, addCustomExercise, deleteCustomExercise, updateCustomExercise,
+  type CustomExercise,
+} from '@/lib/repo';
 import { getPlan } from '@/lib/plans';
+import { searchExercises, GROUP_LABELS, type Exercise } from '@/lib/exercises';
 import { fmtDate } from '@/lib/utils';
 import type { ExercisePlan, User, Workout, WorkoutSet } from '@/types';
 
@@ -15,8 +20,10 @@ export default function WorkoutSession() {
   const [user, setUser] = useState<User | null>(null);
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [sets, setSets] = useState<WorkoutSet[]>([]);
+  const [customs, setCustoms] = useState<CustomExercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFinish, setShowFinish] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
   const [duration, setDuration] = useState('');
   const [notes, setNotes] = useState('');
   const [history, setHistory] = useState<Record<string, Array<{ date: string; weight_kg: number; reps: number }>>>({});
@@ -26,9 +33,10 @@ export default function WorkoutSession() {
 
   const refresh = useCallback(async () => {
     if (!id) return;
-    const [w, s] = await Promise.all([getWorkout(id), getWorkoutSets(id)]);
+    const [w, s, c] = await Promise.all([getWorkout(id), getWorkoutSets(id), listCustomExercises(id)]);
     setWorkout(w);
     setSets(s);
+    setCustoms(c);
   }, [id]);
 
   useEffect(() => {
@@ -41,15 +49,16 @@ export default function WorkoutSession() {
     })();
   }, [navigate, refresh]);
 
-  // Load history on demand per exercise
+  // Load history on demand per exercise (plan + custom)
   useEffect(() => {
     if (!user || !plan) return;
-    plan.exercises.forEach(async (ex) => {
-      if (history[ex.name]) return;
-      const h = await getExerciseHistory(user.id, ex.name, 6);
-      setHistory((prev) => ({ ...prev, [ex.name]: h }));
+    const all = [...plan.exercises.map((e) => e.name), ...customs.map((c) => c.exercise_name)];
+    all.forEach(async (name) => {
+      if (history[name]) return;
+      const h = await getExerciseHistory(user.id, name, 6);
+      setHistory((prev) => ({ ...prev, [name]: h }));
     });
-  }, [user, plan, history]);
+  }, [user, plan, customs, history]);
 
   const setsByExercise = useMemo(() => {
     const map: Record<string, WorkoutSet[]> = {};
@@ -92,6 +101,42 @@ export default function WorkoutSession() {
             onDelete={async (setId) => { await deleteSet(setId); refresh(); }}
           />
         ))}
+
+        {customs.map((c) => (
+          <ExerciseBlock
+            key={c.id}
+            exercise={{ name: c.exercise_name, sets: c.target_sets, reps: c.target_reps }}
+            sets={setsByExercise[c.exercise_name] ?? []}
+            history={history[c.exercise_name] ?? []}
+            historyOpen={openHistory === c.exercise_name}
+            isCustom
+            onToggleHistory={() => setOpenHistory(openHistory === c.exercise_name ? null : c.exercise_name)}
+            onAdd={async (weight, reps) => {
+              const next = (setsByExercise[c.exercise_name]?.length ?? 0) + 1;
+              await logSet(workout.id, c.exercise_name, next, weight, reps);
+              await refresh();
+            }}
+            onDelete={async (setId) => { await deleteSet(setId); refresh(); }}
+            onUpdateTarget={async (setsT, repsT) => {
+              await updateCustomExercise(c.id, setsT, repsT);
+              await refresh();
+            }}
+            onRemoveExercise={async () => {
+              if (!window.confirm(`Remover "${c.exercise_name}" do treino? As séries já registadas mantêm-se no histórico.`)) return;
+              await deleteCustomExercise(c.id);
+              await refresh();
+            }}
+          />
+        ))}
+
+        {!workout.completed_at && (
+          <button
+            onClick={() => setShowAdd(true)}
+            className="btn-ghost w-full text-sm border-dashed"
+          >
+            <Plus size={14} /> Adicionar exercício
+          </button>
+        )}
       </div>
 
       <div className="mt-6">
@@ -147,6 +192,23 @@ export default function WorkoutSession() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {showAdd && (
+          <AddExerciseModal
+            existingNames={new Set([
+              ...plan.exercises.map((e) => e.name.toLowerCase()),
+              ...customs.map((c) => c.exercise_name.toLowerCase()),
+            ])}
+            onClose={() => setShowAdd(false)}
+            onPick={async (name, sets, reps) => {
+              await addCustomExercise(workout.id, name, sets, reps);
+              setShowAdd(false);
+              await refresh();
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -156,12 +218,15 @@ interface BlockProps {
   sets: WorkoutSet[];
   history: Array<{ date: string; weight_kg: number; reps: number }>;
   historyOpen: boolean;
+  isCustom?: boolean;
   onToggleHistory: () => void;
   onAdd: (weight: number, reps: number) => Promise<void>;
   onDelete: (setId: string) => Promise<void>;
+  onUpdateTarget?: (targetSets: number, targetReps: string) => Promise<void>;
+  onRemoveExercise?: () => Promise<void>;
 }
 
-function ExerciseBlock({ exercise, sets, history, historyOpen, onToggleHistory, onAdd, onDelete }: BlockProps) {
+function ExerciseBlock({ exercise, sets, history, historyOpen, isCustom, onToggleHistory, onAdd, onDelete, onUpdateTarget, onRemoveExercise }: BlockProps) {
   const [w, setW] = useState('');
   const [r, setR] = useState('');
   const [busy, setBusy] = useState(false);
@@ -184,17 +249,40 @@ function ExerciseBlock({ exercise, sets, history, historyOpen, onToggleHistory, 
   }
 
   return (
-    <div className="card">
+    <div className={`card ${isCustom ? 'border-flame-400/30' : ''}`}>
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h3 className="font-semibold leading-tight">{exercise.name}</h3>
-          <p className="text-xs text-muted mt-0.5">
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold leading-tight flex items-center gap-1.5">
+            {exercise.name}
+            {isCustom && <span className="pill bg-flame-500/15 text-flame-400 text-[9px]">extra</span>}
+          </h3>
+          <button
+            onClick={() => {
+              if (!onUpdateTarget) return;
+              const ns = window.prompt(`Séries para "${exercise.name}":`, String(exercise.sets));
+              if (!ns) return;
+              const nr = window.prompt(`Reps para "${exercise.name}":`, exercise.reps);
+              if (!nr) return;
+              const setsN = Math.max(1, Math.min(20, Number(ns) || exercise.sets));
+              onUpdateTarget(setsN, nr);
+            }}
+            className={`text-xs text-muted mt-0.5 ${onUpdateTarget ? 'hover:text-flame-400 cursor-pointer' : 'cursor-default'}`}
+            disabled={!onUpdateTarget}
+          >
             alvo: <span className="text-white/80 font-semibold">{exercise.sets} × {exercise.reps}</span>
-          </p>
+            {onUpdateTarget && <span className="ml-1 text-muted/60">✎</span>}
+          </button>
         </div>
-        <span className={`pill ${done >= targetSets ? 'bg-gold-500/20 text-gold-400' : 'bg-ink-700 text-muted'}`}>
-          {done}/{targetSets}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={`pill ${done >= targetSets ? 'bg-gold-500/20 text-gold-400' : 'bg-ink-700 text-muted'}`}>
+            {done}/{targetSets}
+          </span>
+          {onRemoveExercise && (
+            <button onClick={onRemoveExercise} className="p-1.5 rounded-lg text-muted hover:text-flame-400" title="Remover do treino">
+              <Trash2 size={13} />
+            </button>
+          )}
+        </div>
       </div>
 
       {sets.length > 0 && (
@@ -260,5 +348,146 @@ function ExerciseBlock({ exercise, sets, history, historyOpen, onToggleHistory, 
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function AddExerciseModal({
+  existingNames, onClose, onPick,
+}: {
+  existingNames: Set<string>;
+  onClose: () => void;
+  onPick: (name: string, sets: number, reps: string) => Promise<void>;
+}) {
+  const [q, setQ] = useState('');
+  const [picked, setPicked] = useState<Exercise | null>(null);
+  const [customName, setCustomName] = useState('');
+  const [sets, setSets] = useState('3');
+  const [reps, setReps] = useState('8-12');
+  const [busy, setBusy] = useState(false);
+
+  const results = useMemo(() => searchExercises(q, 50), [q]);
+  const showCustomFallback = q.trim().length >= 3 && results.length === 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur flex items-end justify-center px-3 pb-3"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        onClick={(e) => e.stopPropagation()}
+        className="card w-full max-w-md max-h-[85dvh] flex flex-col"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-display text-2xl flex items-center gap-2">
+              <Dumbbell size={18} className="text-flame-400" /> Adicionar exercício
+            </h3>
+            <p className="text-[11px] text-muted uppercase tracking-wider">escreve, escolhe e vai</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg bg-ink-700/60"><X size={16} /></button>
+        </div>
+
+        {!picked && (
+          <>
+            <div className="relative mb-3">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              <input
+                className="input pl-10"
+                placeholder="ex: supino, lat, agachamento, curl…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <ul className="overflow-y-auto flex-1 -mx-1 space-y-1.5">
+              {results.map((e) => {
+                const already = existingNames.has(e.name.toLowerCase());
+                return (
+                  <li key={e.name}>
+                    <button
+                      disabled={already}
+                      onClick={() => setPicked(e)}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl active:scale-[0.99] ${already ? 'bg-ink-700/30 opacity-50' : 'bg-ink-700/50'}`}
+                    >
+                      <p className="font-semibold text-sm flex items-center justify-between gap-2">
+                        <span className="truncate">{e.name}</span>
+                        <span className="pill bg-ink-800 text-flame-300/80 text-[10px]">{GROUP_LABELS[e.group]}</span>
+                      </p>
+                      {already && <p className="text-[10px] text-muted">já está no treino</p>}
+                    </button>
+                  </li>
+                );
+              })}
+              {results.length === 0 && q.trim().length === 0 && (
+                <li className="text-muted text-sm text-center py-4">começa a escrever…</li>
+              )}
+              {showCustomFallback && (
+                <li className="card !p-3 mt-2 border-dashed border-flame-400/30">
+                  <p className="text-xs text-muted mb-2">Não encontrei "{q}". Adiciona como exercício novo:</p>
+                  <button
+                    onClick={() => { setCustomName(q.trim()); setPicked({ name: q.trim(), group: 'funcional' }); }}
+                    className="btn-primary w-full"
+                  >
+                    <Plus size={14} /> usar "{q}"
+                  </button>
+                </li>
+              )}
+            </ul>
+          </>
+        )}
+
+        {picked && (
+          <div className="space-y-3">
+            <div className="card !p-3 bg-flame-500/5 border-flame-400/30">
+              <p className="font-semibold">{customName || picked.name}</p>
+              <p className="text-[11px] text-muted uppercase tracking-wider">{GROUP_LABELS[picked.group]}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="label">Séries</label>
+                <div className="flex items-center gap-1 mt-1">
+                  {['3', '4', '5'].map((n) => (
+                    <button key={n} onClick={() => setSets(n)} className={`flex-1 py-2 rounded-lg border text-sm font-bold ${sets === n ? 'border-flame-400 bg-flame-500/15 text-flame-400' : 'border-ink-500/60 bg-ink-700/50'}`}>
+                      {n}
+                    </button>
+                  ))}
+                  <input type="number" inputMode="numeric" className="input !py-2 w-16 text-center" value={sets} onChange={(e) => setSets(e.target.value)} />
+                </div>
+              </div>
+              <div>
+                <label className="label">Reps</label>
+                <div className="flex items-center gap-1 mt-1 flex-wrap">
+                  {['6-8', '8-12', '12-15'].map((n) => (
+                    <button key={n} onClick={() => setReps(n)} className={`flex-1 py-2 rounded-lg border text-xs font-bold ${reps === n ? 'border-flame-400 bg-flame-500/15 text-flame-400' : 'border-ink-500/60 bg-ink-700/50'}`}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <input className="input !py-2 mt-1 text-center text-sm" value={reps} onChange={(e) => setReps(e.target.value)} placeholder='ex: "8-12", "5×5", "30s"' />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => { setPicked(null); setCustomName(''); }} className="btn-ghost">voltar</button>
+              <button
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    const setsN = Math.max(1, Math.min(20, Number(sets) || 3));
+                    await onPick(customName || picked.name, setsN, reps || '8-12');
+                  } finally { setBusy(false); }
+                }}
+                disabled={busy}
+                className="btn-primary"
+              >
+                <Plus size={14} /> {busy ? 'a adicionar…' : 'adicionar'}
+              </button>
+            </div>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
   );
 }

@@ -37,6 +37,12 @@ export default defineConfig(({ mode }) => {
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
           navigateFallback: `${base}index.html`,
+          // Activate the new SW immediately and take control of any open clients.
+          // Combined with registerType:'autoUpdate' + reload-on-update on the client,
+          // this prevents the "first load shows stale, refresh fixes it" problem.
+          skipWaiting: true,
+          clientsClaim: true,
+          cleanupOutdatedCaches: true,
         },
       }),
     ],

@@ -62,6 +62,43 @@ export async function getExerciseHistory(userId: string, exercise: string, limit
   `) as Array<{ date: string; weight_kg: number; reps: number }>;
 }
 
+// ---------- Custom exercises (added ad-hoc to a session) ----------
+export interface CustomExercise {
+  id: string;
+  workout_id: string;
+  exercise_name: string;
+  target_sets: number;
+  target_reps: string;
+  position: number;
+  created_at: string;
+}
+export async function listCustomExercises(workoutId: string): Promise<CustomExercise[]> {
+  return (await sql`
+    select * from workout_custom_exercises
+    where workout_id = ${workoutId}
+    order by position asc, created_at asc
+  `) as CustomExercise[];
+}
+export async function addCustomExercise(workoutId: string, name: string, targetSets = 3, targetReps = '8-12'): Promise<CustomExercise> {
+  const posRows = (await sql`
+    select coalesce(max(position), -1) + 1 as p
+    from workout_custom_exercises where workout_id = ${workoutId}
+  `) as { p: number }[];
+  const position = posRows[0]?.p ?? 0;
+  const rows = (await sql`
+    insert into workout_custom_exercises (workout_id, exercise_name, target_sets, target_reps, position)
+    values (${workoutId}, ${name}, ${targetSets}, ${targetReps}, ${position})
+    returning *
+  `) as CustomExercise[];
+  return rows[0];
+}
+export async function deleteCustomExercise(id: string): Promise<void> {
+  await sql`delete from workout_custom_exercises where id = ${id}`;
+}
+export async function updateCustomExercise(id: string, targetSets: number, targetReps: string): Promise<void> {
+  await sql`update workout_custom_exercises set target_sets = ${targetSets}, target_reps = ${targetReps} where id = ${id}`;
+}
+
 // ---------- Foods / Meals ----------
 export async function listFoods(): Promise<Food[]> {
   return (await sql`select * from foods order by is_default desc, name asc`) as Food[];
