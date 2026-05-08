@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App';
+import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
 const base = import.meta.env.VITE_BASE_PATH ?? '/';
@@ -42,7 +43,21 @@ function isChunkLoadError(err: unknown): boolean {
   return /ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module|Importing a module script failed/i.test(msg);
 }
 
-if (import.meta.env.PROD) {
+// Emergency reset: visiting `?reset=1` nukes ALL local state (caches, SW,
+// localStorage session) and reloads. Acessível mesmo se a app não carrega:
+//   https://locked-summer.vercel.app/?reset=1
+const isResetMode =
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('reset') === '1';
+
+if (isResetMode) {
+  try { localStorage.clear(); } catch { /* swallow */ }
+  document.getElementById('root')!.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:center;min-height:100dvh;background:#050505;color:#A78BFA;font-family:system-ui,-apple-system,sans-serif;flex-direction:column;gap:12px;text-align:center;padding:24px"><div style="font-size:48px">🔄</div><div style="font-size:20px;font-weight:700">A limpar tudo…</div><div style="font-size:13px;color:#9a9a9a">A app vai recarregar em segundos.</div></div>';
+  void nukeAndReload('manual reset via ?reset=1');
+}
+
+if (!isResetMode && import.meta.env.PROD) {
   const updateSW = registerSW({
     immediate: true,
     onNeedRefresh() {
@@ -79,10 +94,14 @@ if (import.meta.env.PROD) {
   });
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <BrowserRouter basename={base}>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>,
-);
+if (!isResetMode) {
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <BrowserRouter basename={base}>
+          <App />
+        </BrowserRouter>
+      </ErrorBoundary>
+    </React.StrictMode>,
+  );
+}
