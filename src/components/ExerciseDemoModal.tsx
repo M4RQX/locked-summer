@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, ImageOff, ArrowLeftRight } from 'lucide-react';
-import { getExerciseDemo } from '@/lib/exercises';
+import { X, ImageOff, ArrowLeftRight, Dumbbell, Target, Zap } from 'lucide-react';
+import {
+  getExerciseDemo, getExerciseDetails,
+  MUSCLE_PT_LABELS, EQUIPMENT_PT_LABELS, FORCE_PT_LABELS, LEVEL_PT_LABELS, MECHANIC_PT_LABELS,
+  type ExerciseDetails,
+} from '@/lib/exercises';
 
 interface Props {
   exerciseName: string;
@@ -10,20 +14,43 @@ interface Props {
 
 /**
  * Modal de demonstração de um exercício.
- * Usa imagens do free-exercise-db (Apache 2.0) servidas via raw.githubusercontent.com.
- * Mostra start/end posture lado a lado e alterna automaticamente como GIF stop-motion.
+ * Imagens do free-exercise-db (Apache 2.0). Mostra:
+ * 1. Stop-motion das 2 frames (início/fim) com crossfade suave 500ms
+ * 2. Side-by-side estático para análise detalhada
+ * 3. Chips PT: equipamento, músculos primários/secundários, força, nível, mecânica
+ * 4. Lista numerada de instruções passo-a-passo
  */
 export default function ExerciseDemoModal({ exerciseName, onClose }: Props) {
   const demo = getExerciseDemo(exerciseName);
   const [frame, setFrame] = useState<0 | 1>(0);
   const [imgError, setImgError] = useState<{ start: boolean; end: boolean }>({ start: false, end: false });
+  const [details, setDetails] = useState<ExerciseDetails | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(true);
 
-  // Stop-motion alternation between start/end every 900ms (only if we have demo and both images load).
+  // Slower alternation (1200ms) for clearer visualization, smoother crossfade (500ms).
   useEffect(() => {
     if (!demo || imgError.start || imgError.end) return;
-    const id = setInterval(() => setFrame((f) => (f === 0 ? 1 : 0)), 900);
+    const id = setInterval(() => setFrame((f) => (f === 0 ? 1 : 0)), 1200);
     return () => clearInterval(id);
   }, [demo, imgError]);
+
+  // Lazy-load full details (instructions, muscles, equipment) once cached.
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingDetails(true);
+    getExerciseDetails(exerciseName).then((d) => {
+      if (cancelled) return;
+      setDetails(d);
+      setLoadingDetails(false);
+    });
+    return () => { cancelled = true; };
+  }, [exerciseName]);
+
+  const ptMuscle = (m: string) => MUSCLE_PT_LABELS[m.toLowerCase()] ?? m;
+  const ptEquipment = (e: string) => EQUIPMENT_PT_LABELS[e.toLowerCase()] ?? e;
+  const ptForce = (f: string | null) => f ? (FORCE_PT_LABELS[f] ?? f) : null;
+  const ptLevel = (l: string) => LEVEL_PT_LABELS[l] ?? l;
+  const ptMechanic = (m: string | null) => m ? (MECHANIC_PT_LABELS[m] ?? m) : null;
 
   return (
     <motion.div
@@ -35,9 +62,10 @@ export default function ExerciseDemoModal({ exerciseName, onClose }: Props) {
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         onClick={(e) => e.stopPropagation()}
-        className="card w-full max-w-md"
+        className="card w-full max-w-md max-h-[92dvh] flex flex-col"
       >
-        <div className="flex items-center justify-between mb-3 gap-2">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3 gap-2 shrink-0">
           <div className="min-w-0">
             <h3 className="font-display text-2xl leading-tight truncate">{exerciseName}</h3>
             <p className="text-[11px] text-muted uppercase tracking-wider">como fazer</p>
@@ -45,58 +73,127 @@ export default function ExerciseDemoModal({ exerciseName, onClose }: Props) {
           <button onClick={onClose} className="p-2 rounded-lg bg-ink-700/60 shrink-0"><X size={16} /></button>
         </div>
 
-        {!demo && <DemoFallback name={exerciseName} />}
+        {/* Scrollable content */}
+        <div className="overflow-y-auto -mx-1 px-1 flex-1">
+          {!demo && <DemoFallback name={exerciseName} />}
 
-        {demo && (
-          <div className="space-y-3">
-            {/* Animated single frame (stop-motion alternating) */}
-            <div className="relative aspect-square rounded-2xl overflow-hidden bg-ink-700">
-              {!imgError.start && (
-                <img
-                  src={demo.start}
-                  alt={`${exerciseName} - posição inicial`}
-                  className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${frame === 0 ? 'opacity-100' : 'opacity-0'}`}
-                  onError={() => setImgError((e) => ({ ...e, start: true }))}
-                />
-              )}
-              {!imgError.end && (
-                <img
-                  src={demo.end}
-                  alt={`${exerciseName} - posição final`}
-                  className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${frame === 1 ? 'opacity-100' : 'opacity-0'}`}
-                  onError={() => setImgError((e) => ({ ...e, end: true }))}
-                />
-              )}
-              {(imgError.start && imgError.end) && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-muted gap-2">
-                  <ImageOff size={32} />
-                  <p className="text-sm">imagem não disponível</p>
+          {demo && (
+            <div className="space-y-3">
+              {/* Big stop-motion frame (1200ms cycle, 500ms crossfade) */}
+              <div className="relative aspect-square rounded-2xl overflow-hidden bg-ink-700">
+                {!imgError.start && (
+                  <img
+                    src={demo.start}
+                    alt={`${exerciseName} - posição inicial`}
+                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out ${frame === 0 ? 'opacity-100' : 'opacity-0'}`}
+                    onError={() => setImgError((e) => ({ ...e, start: true }))}
+                  />
+                )}
+                {!imgError.end && (
+                  <img
+                    src={demo.end}
+                    alt={`${exerciseName} - posição final`}
+                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out ${frame === 1 ? 'opacity-100' : 'opacity-0'}`}
+                    onError={() => setImgError((e) => ({ ...e, end: true }))}
+                  />
+                )}
+                {(imgError.start && imgError.end) && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-muted gap-2">
+                    <ImageOff size={32} />
+                    <p className="text-sm">imagem não disponível</p>
+                  </div>
+                )}
+                <div className="absolute top-2 right-2 pill bg-black/60 text-white/80 text-[10px]">
+                  <ArrowLeftRight size={10} className="inline mr-1" /> {frame === 0 ? 'início' : 'fim'}
+                </div>
+              </div>
+
+              {/* Side-by-side static for analysis */}
+              {!imgError.start && !imgError.end && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="relative aspect-square rounded-xl overflow-hidden bg-ink-700">
+                    <img src={demo.start} alt="início" className="w-full h-full object-cover" />
+                    <span className="absolute bottom-1 left-1 pill bg-black/60 text-white text-[9px]">1 · início</span>
+                  </div>
+                  <div className="relative aspect-square rounded-xl overflow-hidden bg-ink-700">
+                    <img src={demo.end} alt="fim" className="w-full h-full object-cover" />
+                    <span className="absolute bottom-1 left-1 pill bg-black/60 text-white text-[9px]">2 · fim</span>
+                  </div>
                 </div>
               )}
-              <div className="absolute top-2 right-2 pill bg-black/60 text-white/80 text-[10px]">
-                <ArrowLeftRight size={10} className="inline mr-1" /> {frame === 0 ? 'início' : 'fim'}
-              </div>
+
+              {/* Chips: equipment + force + level + mechanic */}
+              {details && (
+                <div className="flex flex-wrap gap-1.5">
+                  <span className="pill bg-flame-500/15 text-flame-300 border border-flame-400/30">
+                    <Dumbbell size={11} className="inline mr-1" /> {ptEquipment(details.equipment)}
+                  </span>
+                  {ptForce(details.force) && (
+                    <span className="pill bg-ink-700 text-white/80">{ptForce(details.force)}</span>
+                  )}
+                  {ptMechanic(details.mechanic) && (
+                    <span className="pill bg-ink-700 text-white/80">{ptMechanic(details.mechanic)}</span>
+                  )}
+                  <span className="pill bg-ink-700 text-muted">{ptLevel(details.level)}</span>
+                </div>
+              )}
+
+              {/* Muscles trabalhados */}
+              {details && (
+                <div className="card !p-3 bg-ink-800/60">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target size={13} className="text-flame-400" />
+                    <span className="label">músculos trabalhados</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] uppercase tracking-wider text-muted w-16 shrink-0">primários</span>
+                      {details.primaryMuscles.map((m) => (
+                        <span key={m} className="pill bg-flame-500/20 text-flame-300 border border-flame-400/40">{ptMuscle(m)}</span>
+                      ))}
+                    </div>
+                    {details.secondaryMuscles.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wider text-muted w-16 shrink-0">secundários</span>
+                        {details.secondaryMuscles.map((m) => (
+                          <span key={m} className="pill bg-ink-700 text-white/70">{ptMuscle(m)}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Instruções passo-a-passo */}
+              {details && details.instructions.length > 0 && (
+                <div className="card !p-3 bg-ink-800/60">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Zap size={13} className="text-flame-400" />
+                    <span className="label">como executar</span>
+                  </div>
+                  <ol className="space-y-2">
+                    {details.instructions.map((step, i) => (
+                      <li key={i} className="flex gap-2.5 text-sm leading-relaxed">
+                        <span className="shrink-0 w-6 h-6 rounded-full bg-flame-500/20 border border-flame-400/40 text-flame-300 text-xs font-bold flex items-center justify-center mt-0.5">
+                          {i + 1}
+                        </span>
+                        <span className="text-white/85">{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              {loadingDetails && !details && (
+                <p className="text-[11px] text-muted text-center py-2">A carregar detalhes…</p>
+              )}
+
+              <p className="text-[10px] text-muted text-center pt-1">
+                fonte: free-exercise-db · instruções em inglês (fonte original)
+              </p>
             </div>
-
-            {/* Side-by-side static for clarity */}
-            {!imgError.start && !imgError.end && (
-              <div className="grid grid-cols-2 gap-2">
-                <div className="relative aspect-square rounded-xl overflow-hidden bg-ink-700">
-                  <img src={demo.start} alt="início" className="w-full h-full object-cover" />
-                  <span className="absolute bottom-1 left-1 pill bg-black/60 text-white text-[9px]">1 · início</span>
-                </div>
-                <div className="relative aspect-square rounded-xl overflow-hidden bg-ink-700">
-                  <img src={demo.end} alt="fim" className="w-full h-full object-cover" />
-                  <span className="absolute bottom-1 left-1 pill bg-black/60 text-white text-[9px]">2 · fim</span>
-                </div>
-              </div>
-            )}
-
-            <p className="text-[10px] text-muted text-center">
-              fonte: free-exercise-db · Apache 2.0
-            </p>
-          </div>
-        )}
+          )}
+        </div>
       </motion.div>
     </motion.div>
   );

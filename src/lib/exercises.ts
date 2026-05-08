@@ -494,6 +494,104 @@ export function getExerciseDemo(name: string): ExerciseDemo | null {
   };
 }
 
+// ---------- Full exercise metadata (lazy-loaded from free-exercise-db dist) ----------
+export interface ExerciseDetails {
+  id: string;
+  name: string;
+  force: 'push' | 'pull' | 'static' | null;
+  level: 'beginner' | 'intermediate' | 'expert';
+  mechanic: 'compound' | 'isolation' | null;
+  equipment: string;
+  primaryMuscles: string[];
+  secondaryMuscles: string[];
+  category: string;
+  images: string[];
+  instructions: string[];
+}
+
+const DETAILS_URL = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json';
+let detailsCache: Map<string, ExerciseDetails> | null = null;
+let inflightDetailsFetch: Promise<Map<string, ExerciseDetails>> | null = null;
+
+async function loadDetailsIndex(): Promise<Map<string, ExerciseDetails>> {
+  if (detailsCache) return detailsCache;
+  if (inflightDetailsFetch) return inflightDetailsFetch;
+  inflightDetailsFetch = (async () => {
+    const res = await fetch(DETAILS_URL);
+    if (!res.ok) throw new Error(`details fetch ${res.status}`);
+    const arr = (await res.json()) as ExerciseDetails[];
+    const map = new Map(arr.map((e) => [e.id, e]));
+    detailsCache = map;
+    inflightDetailsFetch = null;
+    return map;
+  })();
+  return inflightDetailsFetch;
+}
+
+export async function getExerciseDetails(name: string): Promise<ExerciseDetails | null> {
+  const id = DEMO_MAP[name] ?? NORMALIZED_MAP[normalize(name)];
+  if (!id) return null;
+  try {
+    const idx = await loadDetailsIndex();
+    return idx.get(id) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ---------- Portuguese labels for free-exercise-db enums ----------
+export const MUSCLE_PT_LABELS: Record<string, string> = {
+  chest: 'Peito',
+  shoulders: 'Ombros',
+  triceps: 'Tríceps',
+  biceps: 'Bíceps',
+  forearms: 'Antebraço',
+  abdominals: 'Abdómen',
+  quadriceps: 'Quadríceps',
+  hamstrings: 'Posteriores',
+  glutes: 'Glúteos',
+  calves: 'Gémeos',
+  lats: 'Dorsais',
+  'middle back': 'Costas (meio)',
+  'lower back': 'Lombares',
+  traps: 'Trapézio',
+  neck: 'Pescoço',
+  adductors: 'Adutores',
+  abductors: 'Abdutores',
+};
+
+export const EQUIPMENT_PT_LABELS: Record<string, string> = {
+  barbell: 'Barra',
+  dumbbell: 'Halteres',
+  cable: 'Cabo',
+  machine: 'Máquina',
+  'body only': 'Peso corporal',
+  'medicine ball': 'Medicine ball',
+  'exercise ball': 'Bola suíça',
+  'foam roll': 'Foam roller',
+  kettlebells: 'Kettlebell',
+  bands: 'Bandas elásticas',
+  'e-z curl bar': 'Barra W (EZ)',
+  other: 'Outro',
+};
+
+export const FORCE_PT_LABELS: Record<string, string> = {
+  push: 'Empurrar',
+  pull: 'Puxar',
+  static: 'Estático',
+};
+
+export const LEVEL_PT_LABELS: Record<string, string> = {
+  beginner: 'Iniciante',
+  intermediate: 'Intermédio',
+  expert: 'Avançado',
+};
+
+export const MECHANIC_PT_LABELS: Record<string, string> = {
+  compound: 'Composto',
+  isolation: 'Isolamento',
+};
+
 export function searchExercises(query: string, limit = 30): Exercise[] {
   const q = query.trim().toLowerCase();
   if (!q) return EXERCISES.slice(0, limit);
