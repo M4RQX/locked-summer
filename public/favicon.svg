@@ -1,16 +1,99 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- LOCKED SUMMER — Royal Violet icon
+       Squircle iOS-style + barbell silhouette + small amber flame accent.
+       Generates PNGs 192/512/180 via scripts/generate-icons.mjs. -->
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#FF4500"/>
-      <stop offset="60%" stop-color="#FF6B35"/>
-      <stop offset="100%" stop-color="#FFB627"/>
+    <!-- Background: deep ink → violet sunset -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#0a0312"/>
+      <stop offset="45%"  stop-color="#3b0764"/>
+      <stop offset="85%"  stop-color="#6d28d9"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <!-- Soft top-right glow -->
+    <radialGradient id="glow" cx="0.78" cy="0.22" r="0.7">
+      <stop offset="0%"   stop-color="#c4b5fd" stop-opacity="0.45"/>
+      <stop offset="60%"  stop-color="#a78bfa" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Bottom-left dim -->
+    <radialGradient id="dim" cx="0.15" cy="0.95" r="0.85">
+      <stop offset="0%"   stop-color="#000000" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Barbell metallic gradient -->
+    <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="50%"  stop-color="#ede9fe"/>
+      <stop offset="100%" stop-color="#c4b5fd"/>
+    </linearGradient>
+    <!-- Plate gradient (slightly cooler) -->
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+    <!-- Amber flame -->
+    <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%"   stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#fde68a"/>
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="14" fill="#0a0a0a"/>
-  <!-- flame -->
-  <path d="M32 8c4 8-2 10 1 16 2 4 5 4 7 8 3 6-2 14-8 14-7 0-12-6-12-12 0-7 5-9 5-14 0-5-2-8 7-12z"
-        fill="url(#g)"/>
-  <!-- lock body -->
-  <rect x="20" y="38" width="24" height="18" rx="4" fill="#0a0a0a" stroke="#FFB627" stroke-width="2"/>
-  <rect x="28" y="44" width="8" height="6" rx="2" fill="#FFB627"/>
+
+  <!-- Squircle base (iOS-style) -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#dim)"/>
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+
+  <!-- Subtle inner stroke for premium feel -->
+  <rect x="3" y="3" width="506" height="506" rx="109"
+        fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
+
+  <!-- Barbell — centered, slight offset down, premium proportions -->
+  <g transform="translate(256, 264)">
+    <!-- Drop shadow under bar -->
+    <ellipse cx="0" cy="92" rx="180" ry="14" fill="#000000" opacity="0.35"/>
+
+    <!-- Outer plates (large) -->
+    <rect x="-176" y="-78" width="36" height="156" rx="10" fill="url(#plate)"/>
+    <rect x="140"  y="-78" width="36" height="156" rx="10" fill="url(#plate)"/>
+
+    <!-- Inner plates (smaller) -->
+    <rect x="-138" y="-58" width="22" height="116" rx="7" fill="url(#plate)" opacity="0.85"/>
+    <rect x="116"  y="-58" width="22" height="116" rx="7" fill="url(#plate)" opacity="0.85"/>
+
+    <!-- Bar (horizontal) — passes between plates -->
+    <rect x="-180" y="-13" width="360" height="26" rx="13" fill="url(#bar)"/>
+
+    <!-- Bar highlight -->
+    <rect x="-176" y="-10" width="352" height="6" rx="3" fill="#ffffff" opacity="0.55"/>
+
+    <!-- Knurling marks (small ticks on bar) -->
+    <g fill="#000000" opacity="0.18">
+      <rect x="-100" y="-3" width="2" height="6"/>
+      <rect x="-90"  y="-3" width="2" height="6"/>
+      <rect x="-80"  y="-3" width="2" height="6"/>
+      <rect x="80"   y="-3" width="2" height="6"/>
+      <rect x="90"   y="-3" width="2" height="6"/>
+      <rect x="100"  y="-3" width="2" height="6"/>
+    </g>
+  </g>
+
+  <!-- Small amber flame top-right (the "summer" accent) -->
+  <g transform="translate(390, 70)">
+    <path d="M 22 0
+             C 32 18 24 26 28 38
+             C 30 44 28 50 22 54
+             C 16 50 12 42 14 36
+             C 16 28 10 22 22 0 Z"
+          fill="url(#flame)"
+          opacity="0.95"/>
+    <!-- Flame inner highlight -->
+    <path d="M 22 14 C 26 22 22 28 24 36 C 24 42 20 46 18 44 C 16 40 18 34 18 30 C 18 24 20 20 22 14 Z"
+          fill="#ffffff" opacity="0.5"/>
+  </g>
+
+  <!-- Bottom-left "L•S" wordmark accent (very small, premium feel) -->
+  <g transform="translate(50, 460)" fill="#ffffff" opacity="0.45">
+    <text x="0" y="0" font-family="Inter, system-ui, sans-serif" font-size="26" font-weight="800" letter-spacing="6">L S</text>
+  </g>
 </svg>
