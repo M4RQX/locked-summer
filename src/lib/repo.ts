@@ -299,7 +299,7 @@ export async function getDailyTotalsRange(userId: string, days = 7): Promise<Arr
   }));
 }
 
-export const SHAKE_LOCKED_FOODS = ['Mass gainer (1 scoop)', 'Aveia', 'Leite gordo', 'Banana', 'Morango', 'Mel'];
+export const SHAKE_LOCKED_FOODS = ['Serious Mass (Optimum Nutrition) — 250g', 'Aveia', 'Leite gordo', 'Banana', 'Morango', 'Mel'];
 export async function logShakeLocked(userId: string, date: string): Promise<number> {
   const foods = (await sql`select id, name from foods where name = any(${SHAKE_LOCKED_FOODS as unknown as string})`) as { id: string; name: string }[];
   let count = 0;
