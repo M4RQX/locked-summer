@@ -46,7 +46,7 @@ export default function Sidebar() {
                 whileTap={{ scale: 0.97 }}
                 className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl font-semibold text-sm transition ${
                   isActive
-                    ? 'bg-flame-500/15 text-flame-400 border border-flame-500/30 shadow-[0_0_18px_-6px_rgba(255,69,0,0.4)]'
+                    ? 'bg-flame-500/15 text-flame-400 border border-flame-500/30 shadow-[0_0_18px_-6px_rgba(124,58,237,0.4)]'
                     : 'text-muted hover:text-white/90 border border-transparent'
                 }`}
               >

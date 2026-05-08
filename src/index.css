@@ -33,7 +33,8 @@ body {
   }
   .card-glow {
     @apply card border-flame-400/40;
-    box-shadow: 0 0 0 1px rgba(255,107,53,0.15), 0 12px 40px -16px rgba(255,69,0,0.4);
+    /* Royal Violet glow — substitui antigo rgba(255,69,0,*) laranja. */
+    box-shadow: 0 0 0 1px rgba(139,92,246,0.18), 0 12px 40px -16px rgba(124,58,237,0.45);
   }
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold text-sm px-4 py-3 transition-all active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none select-none;
@@ -64,17 +65,17 @@ body {
   }
 }
 
-/* PR badge animation */
+/* PR badge animation — amber subtil (era amarelo vivo). */
 .pr-glow {
-  background: linear-gradient(90deg, transparent, rgba(255,182,39,0.3), transparent);
+  background: linear-gradient(90deg, transparent, rgba(251,191,36,0.28), transparent);
   background-size: 200% 100%;
   animation: shimmer 3s linear infinite;
 }
 
-/* Smooth scrollbars on webkit */
+/* Smooth scrollbars on webkit — violet (era laranja). */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,69,0,0.25); border-radius: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.28); border-radius: 8px; }
 
 /* iOS PWA safe-area padding helper */
 .pb-safe { padding-bottom: calc(80px + var(--safe-bottom)); }
