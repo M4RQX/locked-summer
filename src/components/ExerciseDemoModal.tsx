@@ -80,13 +80,23 @@ export default function ExerciseDemoModal({ exerciseName, onClose }: Props) {
 
           {demo && (
             <div className="space-y-3">
-              {/* Big stop-motion frame (1200ms cycle, 500ms crossfade) */}
+              {/* Big stop-motion com Ken Burns effect:
+                  - Crossfade 500ms entre os 2 frames (1200ms cycle)
+                  - Cada frame tem zoom + drift sutil enquanto está visível
+                  - Frame inactivo está em estado "rest" (scale 1.0, sem drift)
+                  - Frame activo anima até scale 1.06 com translate diagonal
+                  Resultado: ilusão de movimento contínuo entre as 2 poses,
+                  sem style mismatch nem custos extra. */}
               <div className="relative aspect-square rounded-2xl overflow-hidden bg-ink-700">
                 {!imgError.start && (
                   <img
                     src={demo.start}
                     alt={`${exerciseName} - posição inicial`}
-                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out ${frame === 0 ? 'opacity-100' : 'opacity-0'}`}
+                    className={`absolute inset-0 w-full h-full object-cover transition-all ease-in-out transform-gpu ${
+                      frame === 0
+                        ? 'opacity-100 duration-[1200ms] scale-[1.06] translate-x-[-1.5%] translate-y-[-1%]'
+                        : 'opacity-0 duration-500 scale-100 translate-x-0 translate-y-0'
+                    }`}
                     onError={() => setImgError((e) => ({ ...e, start: true }))}
                   />
                 )}
@@ -94,7 +104,11 @@ export default function ExerciseDemoModal({ exerciseName, onClose }: Props) {
                   <img
                     src={demo.end}
                     alt={`${exerciseName} - posição final`}
-                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ease-in-out ${frame === 1 ? 'opacity-100' : 'opacity-0'}`}
+                    className={`absolute inset-0 w-full h-full object-cover transition-all ease-in-out transform-gpu ${
+                      frame === 1
+                        ? 'opacity-100 duration-[1200ms] scale-[1.06] translate-x-[1.5%] translate-y-[1%]'
+                        : 'opacity-0 duration-500 scale-100 translate-x-0 translate-y-0'
+                    }`}
                     onError={() => setImgError((e) => ({ ...e, end: true }))}
                   />
                 )}
