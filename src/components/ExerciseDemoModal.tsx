@@ -6,6 +6,7 @@ import {
   MUSCLE_PT_LABELS, EQUIPMENT_PT_LABELS, FORCE_PT_LABELS, LEVEL_PT_LABELS, MECHANIC_PT_LABELS,
   type ExerciseDetails,
 } from '@/lib/exercises';
+import { getInstructionsPT } from '@/lib/instructions-pt';
 
 interface Props {
   exerciseName: string;
@@ -164,32 +165,40 @@ export default function ExerciseDemoModal({ exerciseName, onClose }: Props) {
                 </div>
               )}
 
-              {/* Instruções passo-a-passo */}
-              {details && details.instructions.length > 0 && (
-                <div className="card !p-3 bg-ink-800/60">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap size={13} className="text-flame-400" />
-                    <span className="label">como executar</span>
+              {/* Instruções passo-a-passo (PT preferido, EN fallback) */}
+              {details && (() => {
+                const pt = getInstructionsPT(details.id);
+                const steps = pt ?? details.instructions;
+                if (!steps || steps.length === 0) return null;
+                return (
+                  <div className="card !p-3 bg-ink-800/60">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap size={13} className="text-flame-400" />
+                      <span className="label">como executar</span>
+                      {!pt && (
+                        <span className="ml-auto pill bg-ink-700 text-muted text-[9px]">EN</span>
+                      )}
+                    </div>
+                    <ol className="space-y-2">
+                      {steps.map((step, i) => (
+                        <li key={i} className="flex gap-2.5 text-sm leading-relaxed">
+                          <span className="shrink-0 w-6 h-6 rounded-full bg-flame-500/20 border border-flame-400/40 text-flame-300 text-xs font-bold flex items-center justify-center mt-0.5">
+                            {i + 1}
+                          </span>
+                          <span className="text-white/85">{step}</span>
+                        </li>
+                      ))}
+                    </ol>
                   </div>
-                  <ol className="space-y-2">
-                    {details.instructions.map((step, i) => (
-                      <li key={i} className="flex gap-2.5 text-sm leading-relaxed">
-                        <span className="shrink-0 w-6 h-6 rounded-full bg-flame-500/20 border border-flame-400/40 text-flame-300 text-xs font-bold flex items-center justify-center mt-0.5">
-                          {i + 1}
-                        </span>
-                        <span className="text-white/85">{step}</span>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              )}
+                );
+              })()}
 
               {loadingDetails && !details && (
                 <p className="text-[11px] text-muted text-center py-2">A carregar detalhes…</p>
               )}
 
               <p className="text-[10px] text-muted text-center pt-1">
-                fonte: free-exercise-db · instruções em inglês (fonte original)
+                fonte: free-exercise-db · {details && getInstructionsPT(details.id) ? 'instruções traduzidas' : 'instruções em inglês'}
               </p>
             </div>
           )}
