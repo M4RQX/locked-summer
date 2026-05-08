@@ -8,14 +8,16 @@ import './index.css';
 
 const base = import.meta.env.VITE_BASE_PATH ?? '/';
 
-// Auto-update PWA — crítico para iPhone PWA standalone (sem botão refresh).
+// Auto-update PWA:
 // 1. Registra SW e força reload quando há nova versão (skipWaiting + clientsClaim
-//    no workbox config já activam o novo SW de imediato).
-// 2. A cada 60s, se online, chama registration.update() para verificar deploy novo.
-// 3. Quando o user volta à app (visibilitychange → visible), também verifica.
-// 4. NUCLEAR FALLBACK: se um chunk JS falhar a carregar (sintoma de HTML stale
-//    a apontar para hash antigo que já não existe), limpa todas as caches +
-//    desregista SW + reload. Auto-recovery sem o user fazer nada.
+//    no workbox config activam o novo SW imediatamente).
+// 2. A cada 60s, se online, chama registration.update().
+// 3. Em visibilitychange (utilizador voltou à app) também verifica.
+//
+// NÃO há mais auto-nuke baseado em window.error / unhandledrejection — causava
+// loop "Algo correu mal" ⇄ "A limpar tudo". O nuke fica reservado a:
+//   - URL manual `?reset=1`
+//   - Botão do ErrorBoundary (só dispara em erros reais de render React)
 
 async function nukeAndReload(reason: string): Promise<void> {
   // eslint-disable-next-line no-console
@@ -30,17 +32,9 @@ async function nukeAndReload(reason: string): Promise<void> {
       await Promise.all(regs.map((r) => r.unregister()));
     }
   } catch { /* swallow — reload anyway */ }
-  // Use location.replace + cachebuster to force a fully fresh boot.
   const u = new URL(window.location.href);
-  u.searchParams.set('_v', String(Date.now()));
+  u.search = '';
   window.location.replace(u.toString());
-}
-
-function isChunkLoadError(err: unknown): boolean {
-  if (!err) return false;
-  const msg = String((err as { message?: string })?.message ?? err);
-  // Vite/Rollup fail names + generic "failed to fetch dynamically imported module"
-  return /ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module|Importing a module script failed/i.test(msg);
 }
 
 // Emergency reset: visiting `?reset=1` nukes ALL local state (caches, SW,
@@ -78,19 +72,6 @@ if (!isResetMode && import.meta.env.PROD) {
     if (document.visibilityState === 'visible' && navigator.onLine) {
       updateSW().catch(() => { /* swallow */ });
     }
-  });
-
-  // Nuclear fallback: chunk falhou (HTML stale aponta para hash antigo) → recover.
-  window.addEventListener('error', (event) => {
-    if (isChunkLoadError(event.error) || (event.target as HTMLElement | null)?.tagName === 'SCRIPT') {
-      const src = (event.target as HTMLScriptElement | null)?.src ?? '';
-      if (src.includes('/assets/') || isChunkLoadError(event.error)) {
-        nukeAndReload(`chunk load failed (${src || event.message})`);
-      }
-    }
-  });
-  window.addEventListener('unhandledrejection', (event) => {
-    if (isChunkLoadError(event.reason)) nukeAndReload('unhandled chunk rejection');
   });
 }
 
