@@ -8,7 +8,9 @@ export const PLANS: DayPlan[] = [
     exercises: [
       { name: 'Supino plano (barra ou halteres)', sets: 4, reps: '6-10' },
       { name: 'Supino inclinado com halteres', sets: 3, reps: '8-12' },
+      { name: 'Supino plano (máquina)', sets: 3, reps: '8-12' },
       { name: 'Aberturas (peck deck ou cabos cruzados)', sets: 3, reps: '10-15' },
+      { name: 'Aberturas (peck deck)', sets: 3, reps: '10-15' },
       { name: 'Tríceps na polia (corda/barra)', sets: 3, reps: '10-12' },
       { name: 'Tríceps testa ou fundos', sets: 3, reps: '8-12' },
     ],
