@@ -271,8 +271,8 @@ function ExerciseBlock({ exercise, sets, history, historyOpen, isCustom, onShowD
     setBusy(true);
     try {
       await onAdd(wn, rn);
-      setW('');
-      setR('');
+      // Keep w/r populated so the next set reuses the same weight & reps.
+      // User clears manually via the X button.
     } finally { setBusy(false); }
   }
 
@@ -341,7 +341,7 @@ function ExerciseBlock({ exercise, sets, history, historyOpen, isCustom, onShowD
       )}
 
       {/* Quick add */}
-      <div className="mt-3 grid grid-cols-[1fr,1fr,auto] gap-2">
+      <div className="mt-3 grid grid-cols-[1fr,1fr,auto,auto] gap-2">
         <input
           type="number" inputMode="decimal" step="0.5"
           className="input !py-2.5 text-center font-semibold"
@@ -354,6 +354,16 @@ function ExerciseBlock({ exercise, sets, history, historyOpen, isCustom, onShowD
           value={r} onChange={(e) => setR(e.target.value)}
           placeholder="reps"
         />
+        <button
+          type="button"
+          onClick={() => { setW(''); setR(''); }}
+          disabled={!w && !r}
+          className="btn-ghost !py-2.5 px-3 disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Limpar peso e reps"
+          aria-label="Limpar peso e reps"
+        >
+          <X size={16} />
+        </button>
         <button onClick={add} disabled={busy || !w || !r} className="btn-primary !py-2.5 px-4">
           <Plus size={16} />
         </button>
