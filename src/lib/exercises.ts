@@ -462,18 +462,26 @@ const DEMO_MAP: Record<string, string> = {
   'Medicine ball slam':                    'Medicine_Ball_Slam',
 
   // ---------- ALIASES DO PLANO ----------
-  // Nomes compostos / supersets que aparecem em plans.ts mas não batem
-  // com os nomes canónicos do catálogo. Cada alias aponta para a melhor
-  // demo disponível no free-exercise-db.
+  // Nomes compostos / supersets que aparecem nos planos (defaults e os
+  // que ficaram em DB com nomes originais) mas não batem com os nomes
+  // canónicos do catálogo. Cada alias aponta para a melhor demo
+  // disponível no free-exercise-db.
   'Supino plano (barra ou halteres)':      'Barbell_Bench_Press_-_Medium_Grip',
+  'Supino inclinado com halteres':         'Incline_Dumbbell_Press',
   'Supino plano (máquina)':                'Smith_Machine_Bench_Press',
   'Aberturas (peck deck ou cabos cruzados)': 'Cable_Crossover',
+  'Puxada na polia alta (lat pull-down)':  'Wide-Grip_Lat_Pulldown',
   'Remada com barra ou máquina':           'Bent_Over_Barbell_Row',
+  'Remada unilateral com haltere':         'One-Arm_Dumbbell_Row',
+  'Rosca direta com barra':                'Barbell_Curl',
+  'Rosca inversa com barra':               'Reverse_Barbell_Curl',
   'Tríceps na polia (corda/barra)':        'Triceps_Pushdown_-_Rope_Attachment',
   'Tríceps testa ou fundos':               'EZ-Bar_Skullcrusher',
   'Agachamento ou prensa':                 'Barbell_Squat',
+  'Desenvolvimento de ombros (halteres)':  'Dumbbell_Shoulder_Press',
   'Elevações laterais':                    'Side_Lateral_Raise',
   'Superset: rosca scott + tríceps polia': 'Preacher_Curl',
+  "Farmer's walk (opcional)":              'Farmers_Walk',
 };
 
 // Fuzzy fallback para nomes do plano legacy ou custom: tenta normalizar e procurar.
