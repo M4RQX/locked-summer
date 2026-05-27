@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Check, Flame, Plus, Trash2, History as HistoryIcon, Trophy, X, Search, Dumbbell, Info } from 'lucide-react';
+import { ArrowLeft, Check, Flame, Plus, Trash2, History as HistoryIcon, Trophy, X, Search, Dumbbell, Info, Repeat } from 'lucide-react';
 import Loading from '@/components/Loading';
 import ExerciseDemoModal from '@/components/ExerciseDemoModal';
 import { getCurrentUser } from '@/lib/auth';
 import {
   getWorkout, getWorkoutSets, logSet, deleteSet, finishWorkout, getExerciseHistory,
   listCustomExercises, addCustomExercise, deleteCustomExercise, updateCustomExercise,
-  getDayPlanByCode, type CustomExercise, type UserDayPlanWithExercises,
+  getDayPlanByCode, updatePlanExercise, type CustomExercise, type UserDayPlanWithExercises,
 } from '@/lib/repo';
 import { searchExercises, GROUP_LABELS, type Exercise } from '@/lib/exercises';
 import { fmtDate } from '@/lib/utils';
@@ -30,6 +30,10 @@ export default function WorkoutSession() {
   const [notes, setNotes] = useState('');
   const [history, setHistory] = useState<Record<string, Array<{ date: string; weight_kg: number; reps: number }>>>({});
   const [openHistory, setOpenHistory] = useState<string | null>(null);
+  // Session-only overrides (key = plan_exercise.id, value = new exercise name).
+  // Cleared on next workout. For permanent swap we update DB and refetch plan.
+  const [sessionOverrides, setSessionOverrides] = useState<Record<string, string>>({});
+  const [swap, setSwap] = useState<{ exerciseId: string; currentName: string; targetSets: number; targetReps: string } | null>(null);
 
   const refresh = useCallback(async () => {
     if (!id) return;
@@ -63,7 +67,7 @@ export default function WorkoutSession() {
   useEffect(() => {
     if (!user || !plan) return;
     const all = [
-      ...plan.exercises.map((e) => e.exercise_name),
+      ...plan.exercises.map((e) => sessionOverrides[e.id] ?? e.exercise_name),
       ...customs.map((c) => c.exercise_name),
     ];
     all.forEach(async (name) => {
@@ -71,7 +75,7 @@ export default function WorkoutSession() {
       const h = await getExerciseHistory(user.id, name, 6);
       setHistory((prev) => ({ ...prev, [name]: h }));
     });
-  }, [user, plan, customs, history]);
+  }, [user, plan, customs, history, sessionOverrides]);
 
   const setsByExercise = useMemo(() => {
     const map: Record<string, WorkoutSet[]> = {};
@@ -102,22 +106,24 @@ export default function WorkoutSession() {
 
       <div className="space-y-3">
         {planExercises.map((ex) => {
-          const adapted: ExercisePlan = { name: ex.exercise_name, sets: ex.target_sets, reps: ex.target_reps };
+          const displayName = sessionOverrides[ex.id] ?? ex.exercise_name;
+          const adapted: ExercisePlan = { name: displayName, sets: ex.target_sets, reps: ex.target_reps };
           return (
             <ExerciseBlock
               key={ex.id}
               exercise={adapted}
-              sets={setsByExercise[ex.exercise_name] ?? []}
-              history={history[ex.exercise_name] ?? []}
-              historyOpen={openHistory === ex.exercise_name}
-              onShowDemo={() => setDemoOpen(ex.exercise_name)}
-              onToggleHistory={() => setOpenHistory(openHistory === ex.exercise_name ? null : ex.exercise_name)}
+              sets={setsByExercise[displayName] ?? []}
+              history={history[displayName] ?? []}
+              historyOpen={openHistory === displayName}
+              onShowDemo={() => setDemoOpen(displayName)}
+              onToggleHistory={() => setOpenHistory(openHistory === displayName ? null : displayName)}
               onAdd={async (weight, reps) => {
-                const next = (setsByExercise[ex.exercise_name]?.length ?? 0) + 1;
-                await logSet(workout.id, ex.exercise_name, next, weight, reps);
+                const next = (setsByExercise[displayName]?.length ?? 0) + 1;
+                await logSet(workout.id, displayName, next, weight, reps);
                 await refresh();
               }}
               onDelete={async (setId) => { await deleteSet(setId); refresh(); }}
+              onSwap={() => setSwap({ exerciseId: ex.id, currentName: displayName, targetSets: ex.target_sets, targetReps: ex.target_reps })}
             />
           );
         })}
@@ -236,6 +242,32 @@ export default function WorkoutSession() {
           />
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {swap && (
+          <SwapExerciseModal
+            currentName={swap.currentName}
+            onClose={() => setSwap(null)}
+            onPick={async (newName, scope) => {
+              if (scope === 'today') {
+                setSessionOverrides((prev) => ({ ...prev, [swap.exerciseId]: newName }));
+              } else {
+                await updatePlanExercise(swap.exerciseId, newName, swap.targetSets, swap.targetReps);
+                // Refetch the plan so the new name persists across visits
+                const p = await getDayPlanByCode(user.id, workout.day_type);
+                setPlan(p);
+                // Drop any stale session override for this exercise
+                setSessionOverrides((prev) => {
+                  const next = { ...prev };
+                  delete next[swap.exerciseId];
+                  return next;
+                });
+              }
+              setSwap(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -252,9 +284,10 @@ interface BlockProps {
   onDelete: (setId: string) => Promise<void>;
   onUpdateTarget?: (targetSets: number, targetReps: string) => Promise<void>;
   onRemoveExercise?: () => Promise<void>;
+  onSwap?: () => void;
 }
 
-function ExerciseBlock({ exercise, sets, history, historyOpen, isCustom, onShowDemo, onToggleHistory, onAdd, onDelete, onUpdateTarget, onRemoveExercise }: BlockProps) {
+function ExerciseBlock({ exercise, sets, history, historyOpen, isCustom, onShowDemo, onToggleHistory, onAdd, onDelete, onUpdateTarget, onRemoveExercise, onSwap }: BlockProps) {
   const [w, setW] = useState('');
   const [r, setR] = useState('');
   const [busy, setBusy] = useState(false);
@@ -305,6 +338,11 @@ function ExerciseBlock({ exercise, sets, history, historyOpen, isCustom, onShowD
           {onShowDemo && (
             <button onClick={onShowDemo} className="p-1.5 rounded-lg text-muted hover:text-flame-400" title="Como fazer">
               <Info size={14} />
+            </button>
+          )}
+          {onSwap && (
+            <button onClick={onSwap} className="p-1.5 rounded-lg text-muted hover:text-flame-400" title="Trocar exercício">
+              <Repeat size={14} />
             </button>
           )}
           <span className={`pill ${done >= targetSets ? 'bg-gold-500/20 text-gold-400' : 'bg-ink-700 text-muted'}`}>
@@ -533,6 +571,125 @@ function AddExerciseModal({
                 <Plus size={14} /> {busy ? 'a adicionar…' : 'adicionar'}
               </button>
             </div>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function SwapExerciseModal({
+  currentName, onClose, onPick,
+}: {
+  currentName: string;
+  onClose: () => void;
+  onPick: (newName: string, scope: 'today' | 'forever') => Promise<void>;
+}) {
+  const [q, setQ] = useState('');
+  const [picked, setPicked] = useState<Exercise | null>(null);
+  const [busy, setBusy] = useState<null | 'today' | 'forever'>(null);
+  const hasQuery = q.trim().length > 0;
+  const results = useMemo(() => hasQuery ? searchExercises(q, 50) : [], [q, hasQuery]);
+  const showCustomFallback = q.trim().length >= 3 && results.length === 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur flex items-end justify-center px-3 pb-3"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        onClick={(e) => e.stopPropagation()}
+        className="card w-full max-w-md max-h-[85dvh] flex flex-col"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-display text-2xl flex items-center gap-2">
+              <Repeat size={18} className="text-flame-400" /> Trocar exercício
+            </h3>
+            <p className="text-[11px] text-muted uppercase tracking-wider truncate">a substituir: {currentName}</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg bg-ink-700/60"><X size={16} /></button>
+        </div>
+
+        {!picked && (
+          <>
+            <div className="relative mb-3">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              <input
+                className="input pl-10"
+                placeholder="ex: supino, lat, agachamento, curl…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <ul className="overflow-y-auto flex-1 -mx-1 space-y-1.5">
+              {results.map((e) => (
+                <li key={e.name}>
+                  <button
+                    onClick={() => setPicked(e)}
+                    className="w-full text-left px-3 py-2.5 rounded-xl active:scale-[0.99] bg-ink-700/50"
+                  >
+                    <p className="font-semibold text-sm flex items-center justify-between gap-2">
+                      <span className="truncate">{e.name}</span>
+                      <span className="pill bg-ink-800 text-flame-300/80 text-[10px]">{GROUP_LABELS[e.group]}</span>
+                    </p>
+                  </button>
+                </li>
+              ))}
+              {!hasQuery && (
+                <li className="flex flex-col items-center text-center py-8 px-4 gap-2">
+                  <Search size={28} className="text-flame-400/60" />
+                  <p className="text-sm font-semibold">Procura o substituto</p>
+                  <p className="text-xs text-muted">Mesmo grupo muscular se possível — depois escolhes "só hoje" ou "para sempre".</p>
+                </li>
+              )}
+              {showCustomFallback && (
+                <li className="card !p-3 mt-2 border-dashed border-flame-400/30">
+                  <p className="text-xs text-muted mb-2">Não encontrei "{q}". Usar mesmo assim?</p>
+                  <button
+                    onClick={() => setPicked({ name: q.trim(), group: 'funcional' })}
+                    className="btn-primary w-full"
+                  >
+                    <Plus size={14} /> usar "{q}"
+                  </button>
+                </li>
+              )}
+            </ul>
+          </>
+        )}
+
+        {picked && (
+          <div className="space-y-3">
+            <div className="card !p-3 bg-flame-500/5 border-flame-400/30">
+              <p className="text-[11px] text-muted uppercase tracking-wider">vais trocar para</p>
+              <p className="font-semibold text-base">{picked.name}</p>
+              <p className="text-[11px] text-muted uppercase tracking-wider mt-1">{GROUP_LABELS[picked.group]}</p>
+            </div>
+            <p className="text-xs text-muted px-1">
+              <span className="text-white/80 font-semibold">Só hoje:</span> volta ao original na próxima sessão.<br />
+              <span className="text-white/80 font-semibold">Para sempre:</span> edita o plano em DB. Próxima vez já vem trocado.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={async () => { setBusy('today'); try { await onPick(picked.name, 'today'); } finally { setBusy(null); } }}
+                disabled={busy !== null}
+                className="btn-ghost"
+              >
+                {busy === 'today' ? 'a trocar…' : 'só hoje'}
+              </button>
+              <button
+                onClick={async () => { setBusy('forever'); try { await onPick(picked.name, 'forever'); } finally { setBusy(null); } }}
+                disabled={busy !== null}
+                className="btn-primary"
+              >
+                {busy === 'forever' ? 'a guardar…' : 'para sempre'}
+              </button>
+            </div>
+            <button onClick={() => setPicked(null)} className="btn-ghost w-full text-xs">← voltar à pesquisa</button>
           </div>
         )}
       </motion.div>

@@ -347,6 +347,74 @@ export async function deletePhoto(id: string): Promise<void> {
 }
 
 // ---------- Streak ----------
+// ---------- Strength stats ----------
+
+export interface ExerciseProgress {
+  exercise_name: string;
+  sessions: number;
+  current_max: number;
+  prev_max: number | null;
+  trend: 'up' | 'flat' | 'down';
+  last_date: string;
+}
+
+// Per exercise: current max weight (most recent session) vs previous session.
+// Filters out exercises with only 1 session (no trend possible).
+export async function getExerciseProgression(userId: string, minSessions = 2): Promise<ExerciseProgress[]> {
+  const rows = (await sql`
+    select s.exercise_name, w.date::text as date, max(s.weight_kg)::float as max_w
+    from workout_sets s
+    join workouts w on s.workout_id = w.id
+    where w.user_id = ${userId} and s.weight_kg is not null
+    group by s.exercise_name, w.date
+    order by s.exercise_name asc, w.date desc
+  `) as Array<{ exercise_name: string; date: string; max_w: number }>;
+
+  const byEx: Record<string, Array<{ date: string; max_w: number }>> = {};
+  for (const r of rows) (byEx[r.exercise_name] ??= []).push({ date: r.date, max_w: Number(r.max_w) });
+
+  const out: ExerciseProgress[] = [];
+  for (const [name, hist] of Object.entries(byEx)) {
+    if (hist.length < minSessions) continue;
+    const current = hist[0].max_w;
+    const prev = hist[1]?.max_w ?? null;
+    let trend: 'up' | 'flat' | 'down' = 'flat';
+    if (prev != null) {
+      if (current > prev) trend = 'up';
+      else if (current < prev) trend = 'down';
+    }
+    out.push({
+      exercise_name: name,
+      sessions: hist.length,
+      current_max: current,
+      prev_max: prev,
+      trend,
+      last_date: hist[0].date,
+    });
+  }
+  // Sort by most recently trained
+  out.sort((a, b) => b.last_date.localeCompare(a.last_date));
+  return out;
+}
+
+// Raw sets within a window. Caller maps exercise_name → muscle group via catalog.
+export async function getStrengthSets(userId: string, days = 56): Promise<Array<{
+  exercise_name: string;
+  date: string;
+  weight_kg: number;
+  reps: number;
+}>> {
+  return (await sql`
+    select s.exercise_name, w.date::text as date, s.weight_kg::float as weight_kg, s.reps
+    from workout_sets s
+    join workouts w on s.workout_id = w.id
+    where w.user_id = ${userId}
+      and s.weight_kg is not null
+      and s.reps is not null
+      and w.date >= current_date - (${days}::int * interval '1 day')
+  `) as Array<{ exercise_name: string; date: string; weight_kg: number; reps: number }>;
+}
+
 export async function getStreakDays(userId: string): Promise<number> {
   const rows = (await sql`
     with d as (

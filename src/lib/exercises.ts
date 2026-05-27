@@ -614,6 +614,21 @@ export const MECHANIC_PT_LABELS: Record<string, string> = {
   isolation: 'Isolamento',
 };
 
+// Build a name → group index once. Includes both DEMO_MAP aliases (for plan names
+// like "Supino plano (barra ou halteres)") and catalog exercises. Plan aliases
+// inherit the group of the catalog exercise they alias.
+const NAME_TO_GROUP: Map<string, MuscleGroup> = (() => {
+  const m = new Map<string, MuscleGroup>();
+  for (const e of EXERCISES) m.set(e.name, e.group);
+  // Normalized version too so plan-name variants fuzzy-match
+  for (const e of EXERCISES) m.set(normalize(e.name), e.group);
+  return m;
+})();
+
+export function getMuscleGroupForName(name: string): MuscleGroup | null {
+  return NAME_TO_GROUP.get(name) ?? NAME_TO_GROUP.get(normalize(name)) ?? null;
+}
+
 export function searchExercises(query: string, limit = 30): Exercise[] {
   const q = query.trim().toLowerCase();
   if (!q) return EXERCISES.slice(0, limit);
