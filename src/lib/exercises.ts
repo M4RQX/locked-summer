@@ -460,6 +460,20 @@ const DEMO_MAP: Record<string, string> = {
   'Thruster':                              'Barbell_Thruster',
   'Wall ball':                             'Wall_Ball',
   'Medicine ball slam':                    'Medicine_Ball_Slam',
+
+  // ---------- ALIASES DO PLANO ----------
+  // Nomes compostos / supersets que aparecem em plans.ts mas não batem
+  // com os nomes canónicos do catálogo. Cada alias aponta para a melhor
+  // demo disponível no free-exercise-db.
+  'Supino plano (barra ou halteres)':      'Barbell_Bench_Press_-_Medium_Grip',
+  'Supino plano (máquina)':                'Smith_Machine_Bench_Press',
+  'Aberturas (peck deck ou cabos cruzados)': 'Cable_Crossover',
+  'Remada com barra ou máquina':           'Bent_Over_Barbell_Row',
+  'Tríceps na polia (corda/barra)':        'Triceps_Pushdown_-_Rope_Attachment',
+  'Tríceps testa ou fundos':               'EZ-Bar_Skullcrusher',
+  'Agachamento ou prensa':                 'Barbell_Squat',
+  'Elevações laterais':                    'Side_Lateral_Raise',
+  'Superset: rosca scott + tríceps polia': 'Preacher_Curl',
 };
 
 // Fuzzy fallback para nomes do plano legacy ou custom: tenta normalizar e procurar.
