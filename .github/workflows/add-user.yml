@@ -1,0 +1,28 @@
+name: Add user to DB
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Nome do utilizador (ex: Salvador). Aparece no dropdown.'
+        required: true
+        type: string
+      password:
+        description: 'Password em plaintext. Vai ser hasheada com bcrypt antes do INSERT.'
+        required: true
+        type: string
+
+jobs:
+  insert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install deps
+        run: npm ci
+      - name: Run add-user
+        env:
+          NEON_URL: ${{ secrets.VITE_DATABASE_URL }}
+        run: node scripts/add-user.mjs --name "${{ inputs.name }}" --password "${{ inputs.password }}"
