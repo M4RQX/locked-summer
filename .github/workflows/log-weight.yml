@@ -1,0 +1,45 @@
+name: Log weight
+
+on:
+  workflow_dispatch:
+    inputs:
+      user:
+        description: 'Nome do utilizador (ex: Emanuel)'
+        required: true
+        type: string
+      kg:
+        description: 'Peso em kg (ex: 63 ou 63.4)'
+        required: true
+        type: string
+      date:
+        description: 'Data YYYY-MM-DD (vazio = hoje)'
+        required: false
+        type: string
+      bf:
+        description: '% gordura (opcional)'
+        required: false
+        type: string
+      muscle:
+        description: '% músculo (opcional)'
+        required: false
+        type: string
+
+jobs:
+  log:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Log weight
+        env:
+          NEON_URL: ${{ secrets.VITE_DATABASE_URL }}
+        run: |
+          node scripts/log-weight.mjs \
+            --user "${{ inputs.user }}" \
+            --kg "${{ inputs.kg }}" \
+            ${{ inputs.date && format('--date "{0}"', inputs.date) || '' }} \
+            ${{ inputs.bf && format('--bf "{0}"', inputs.bf) || '' }} \
+            ${{ inputs.muscle && format('--muscle "{0}"', inputs.muscle) || '' }}
