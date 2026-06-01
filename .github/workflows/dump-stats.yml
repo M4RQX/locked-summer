@@ -1,0 +1,23 @@
+name: Dump stats (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      user:
+        description: 'Nome do utilizador (vazio = todos)'
+        required: false
+        type: string
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Dump stats
+        env:
+          NEON_URL: ${{ secrets.VITE_DATABASE_URL }}
+        run: node scripts/dump-stats.mjs ${{ inputs.user && format('--user "{0}"', inputs.user) || '' }}
